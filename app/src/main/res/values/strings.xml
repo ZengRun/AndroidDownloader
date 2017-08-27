@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">文件下载器</string>
+    <string name="on_downloading">当前任务</string>
+    <string name="finished_task">已完成任务</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+</resources>

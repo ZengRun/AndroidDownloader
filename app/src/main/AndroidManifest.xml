@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="zengrun.com.mydownloader">
+
+    <application
+        android:name="zengrun.com.mydownloader.MyApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        <activity
+            android:name="zengrun.com.mydownloader.MainActivity"
+            android:label="@string/on_downloading" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="zengrun.com.mydownloader.FinishedActivity"
+            android:label="@string/finished_task" >
+        </activity>
+        <service android:name="zengrun.com.mydownloader.download.DLService" />
+    </application>
+
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+</manifest>
