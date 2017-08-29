@@ -92,14 +92,28 @@ public class DLWorker {
 
     public void stop(){
         if(downLoadThreads!=null){
-            saveDownloadInfo();
             Log.v(TAG,"下载暂停，存储断点信息");
             onDownload = false;
             for(int i=0;i<downLoadThreads.length;i++){
                 downLoadThreads[i].stopDownLoad();
                 pool.remove(downLoadThreads[i]);
+            }
+            saveDownloadInfo();
+            for(int i=0;i<downLoadThreads.length;i++){
                 downLoadThreads[i]=null;
             }
+
+//            for(int i=0;i<THREADS_PER_TASK;i++){
+//                downLoadThreads[i].stopDownLoad();
+//                pool.remove(downLoadThreads[i]);
+//            }
+//            while(!(downLoadThreads[0].isDead&&downLoadThreads[1].isDead&&downLoadThreads[2].isDead)){}
+//
+//            saveDownloadInfo();
+//            for(int i=0;i<THREADS_PER_TASK;i++){
+//                downLoadThreads[i]=null;
+//            }
+
             downLoadThreads=null;
             handler.sendEmptyMessage(TASK_STOP);
         }
@@ -285,12 +299,12 @@ public class DLWorker {
      * 下载线程
      */
     class DownLoadThread extends Thread{
+        public boolean isDead = false;
         private boolean isdownloading;
         private URL url;
         private HttpURLConnection conn;
         private InputStream inputStream;
         RandomAccessFile accessFile;
-        //private int progress = -1;
         private long start;//开始下载的位置
         private long end;//结束位置
         private long subTaskDownloadSize;//当前线程下载量
@@ -361,12 +375,11 @@ public class DLWorker {
                         if(isSupportBreakpoint){
                             downloadTimes++;
                             if(downloadTimes >= maxDownloadTimes){
-                                if(fileSize > 0){
-                                    saveDownloadInfo();
-                                }
                                 for(int i =0;i<THREADS_PER_TASK;i++){
+                                    downLoadThreads[i].stopDownLoad();
                                     pool.remove(downLoadThreads[i]);
                                 }
+                                saveDownloadInfo();
                                 downLoadThreads = null;
                                 onDownload = false;
                                 Message msg = new Message();
@@ -411,6 +424,7 @@ public class DLWorker {
                     }
                 }
             }
+            isDead = true;
         }
 
         public void stopDownLoad(){

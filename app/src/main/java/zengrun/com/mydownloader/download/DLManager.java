@@ -159,20 +159,6 @@ public class DLManager {
     }
 
     /**
-     * 任务列表的所有任务ID
-     * @return
-     */
-    public List<String> getAllTaskID() {
-        List<String> taskIDlist = new ArrayList<String>();
-        int listSize = workerList.size();
-        for (int i = 0; i < listSize; i++) {
-            DLWorker downloader = workerList.get(i);
-            taskIDlist.add(downloader.getTaskID());
-        }
-        return taskIDlist;
-    }
-
-    /**
      * (获取当前任务列表的所有任务，以TaskInfo列表的方式返回)
      *
      * @return
