@@ -20,7 +20,6 @@
             android:name="zengrun.com.mydownloader.FinishedActivity"
             android:label="@string/finished_task" >
         </activity>
-        <service android:name="zengrun.com.mydownloader.download.DLService" />
     </application>
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />

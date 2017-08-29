@@ -5,10 +5,10 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 /**
- * Created by zengrun on 2017/8/21.
+ * Created by ZR on 2017/8/27.
  */
 
-public class DBHelper extends SQLiteOpenHelper {
+public class DBHelper extends SQLiteOpenHelper  {
     private static final String mDatabaseName = "downloader";
     public static final String TABLE_NAME = "download_info";
     private static SQLiteDatabase.CursorFactory mFactory = null;
@@ -27,7 +27,13 @@ public class DBHelper extends SQLiteOpenHelper {
                 + "filePath VARCHAR, "
                 + "fileName VARCHAR, "
                 + "fileSize VARCHAR, "
-                + "downLoadSize VARCHAR "
+                + "downLoadSize VARCHAR, "
+                + "start1 VARCHAR, "
+                + "start2 VARCHAR, "
+                + "start3 VARCHAR, "
+                + "end1 VARCHAR, "
+                + "end2 VARCHAR, "
+                + "end3 VARCHAR"
                 + ")";
         sdb.execSQL(sql);
     }

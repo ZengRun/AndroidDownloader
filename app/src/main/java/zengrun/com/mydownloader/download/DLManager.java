@@ -3,7 +3,6 @@ package zengrun.com.mydownloader.download;
 import android.content.Context;
 import android.util.Log;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -25,11 +24,11 @@ public class DLManager {
 
     public List<DLWorker> workerList = new ArrayList<DLWorker>();
 
-    private final int MAX_DOWNLOADING_TASK = 5; // 最大同时下载数
+    private final int MAX_DOWNLOADING_THREADS = 15; // 最大线程数
 
     private DownloadSuccess downloadSuccess = null;
 
-    /**服务器是否支持断点续传*/
+    //是否支持断点续传
     private boolean isSupportBreakpoint = false;
 
     //线程池
@@ -37,29 +36,44 @@ public class DLManager {
 
     private DLListener tasklistener;
 
-    public DLManager(Context context) {
+    private volatile static DLManager INSTANCE;
+
+    private DLManager(Context context) {
         mycontext = context;
-        init(context);
+        init();
     }
 
-    private void init(Context context) {
-        pool = new ThreadPoolExecutor(MAX_DOWNLOADING_TASK, MAX_DOWNLOADING_TASK, 30, TimeUnit.SECONDS,
-                                      new ArrayBlockingQueue<Runnable>(2000));
+    private void init() {
+        pool = new ThreadPoolExecutor(MAX_DOWNLOADING_THREADS, MAX_DOWNLOADING_THREADS, 10, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<Runnable>(60));
 
         downloadSuccess = new DownloadSuccess() {
             @Override
-            public void onTaskSuccess(String TaskID) {
-                int size = workerList.size();
-                for (int i = 0; i < size; i++) {
-                    DLWorker downloader = workerList.get(i);
-                    if (downloader.getTaskID().equals(TaskID)) {
-                        workerList.remove(downloader);
-                        return;
+            public void  onTaskSuccess(String TaskID) {
+                synchronized (workerList) {
+                    int size = workerList.size();
+                    for (int i = 0; i < size; i++) {
+                        DLWorker downloader = workerList.get(i);
+                        if (downloader.getTaskID().equals(TaskID)) {
+                            workerList.remove(downloader);
+                            return;
+                        }
                     }
                 }
             }
         };
         recoverData(mycontext);
+    }
+
+    public static DLManager getInstance(Context context){
+        if (INSTANCE == null) {
+            synchronized (DLManager.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new DLManager(context);
+                }
+            }
+        }
+        return INSTANCE;
     }
 
 
@@ -82,6 +96,7 @@ public class DLManager {
                 workerList.add(dloader);
             }
         }
+        Log.v(TAG,"#####recover from database!");
     }
 
 
@@ -294,9 +309,9 @@ public class DLManager {
      */
     private DLWorker getDownloader(String taskID) {
         for (int i = 0; i < workerList.size(); i++) {
-            DLWorker downloader = workerList.get(i);
-            if (taskID != null && taskID.equals(downloader.getTaskID())) {
-                return downloader;
+            DLWorker worker = workerList.get(i);
+            if (taskID != null && taskID.equals(worker.getTaskID())) {
+                return worker;
             }
         }
         return null;

@@ -8,4 +8,6 @@ public class ErrorCode {
     public static final int FILE_TRANS_ERROR = 1;
     public static final int DOWNLOAD_ERROR = 2;
     public static final int HTTP_CONN_ERROR = 3;
+    public static final int FILE_SIZE_ZERO = 4;
+    public static final int OTHERS = 5;
 }

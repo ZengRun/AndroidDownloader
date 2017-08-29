@@ -34,6 +34,7 @@ public class FinishedAdapter extends BaseAdapter {
     private RedownloadClickListener redownloadClickListener;
 
     private final String TEMP_DIR = FileHelper.getTempDirPath();
+    private final String DIR = FileHelper.getFileDefaultPath();
 
     public FinishedAdapter(Context context,DLManager dlManager){
         this.mcontext = context;
@@ -96,9 +97,9 @@ public class FinishedAdapter extends BaseAdapter {
             @Override
             public void onClick(View v) {
                 DownloadInfo downloadInfo = list.get(position);
-                File downloadFile = new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName());
+                File downloadFile = new File(downloadInfo.getFilePath());
                 if(downloadFile.exists()){
-                    downloadFile.delete();
+                    downloadFile.delete(); //删除本地文件
                 }
                 dbAccessor.deleteDownLoadInfo(downloadInfo.getTaskID());//删除数据库的记录
                 dlManager.addTask(downloadInfo.getTaskID(),downloadInfo.getUrl(),downloadInfo.getFileName());

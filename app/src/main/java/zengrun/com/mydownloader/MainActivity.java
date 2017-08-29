@@ -4,13 +4,10 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
@@ -19,15 +16,12 @@ import android.widget.Toast;
 
 import java.io.File;
 
-import zengrun.com.mydownloader.database.DownloadInfo;
 import zengrun.com.mydownloader.database.FileHelper;
 import zengrun.com.mydownloader.download.DLManager;
-import zengrun.com.mydownloader.download.DLService;
 import zengrun.com.mydownloader.download.DLWorker;
 import zengrun.com.mydownloader.download.TaskInfo;
 
 public class MainActivity extends AppCompatActivity {
-    //private Button addButton;
     private ImageButton addButton;
     private TextView finished;
     private ListView listview;
@@ -43,12 +37,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.activity_main);
 
-        //下载管理器需要启动DLService,在刚启动应用的时候需要等Service启动起来后才能获取下载管理器，所以稍微延时获取下载管理器
-        handler.sendEmptyMessageDelayed(1, 50);
-
         addButton = (ImageButton)this.findViewById(R.id.button);
         listview = (ListView)this.findViewById(R.id.listView);
         finished = (TextView)this.findViewById(R.id.finished);
+
+        manager = DLManager.getInstance(MainActivity.this);
+        manager.setSupportBreakpoint(true);
+        adapter = new ListAdapter(MainActivity.this,manager,listview);
+        listview.setAdapter(adapter);
 
         addButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -96,17 +92,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-    Handler handler = new Handler(){
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            manager = DLService.getDLManager();
-            manager.setSupportBreakpoint(true);
-            adapter = new ListAdapter(MainActivity.this,manager,listview);
-            listview.setAdapter(adapter);
-        }
-    };
 
     /**
      * 用户重新下载已完成任务，更新任务列表

@@ -88,21 +88,21 @@ public class ListAdapter extends BaseAdapter {
 
         holder.deleteButton.setOnClickListener(new View.OnClickListener() {
             @Override
-                public void onClick(View v) {
-                    new AlertDialog.Builder(mcontext).setTitle("提示").setCancelable(false).setMessage("确定删除下载任务？")
-                            .setPositiveButton("是", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    TaskInfo task = listData.get(position);
-                                    dlManager.deleteTask(task.getTaskID());
-                                    listData.remove(position);
-                                    ListAdapter.this.notifyDataSetChanged();
-                                }
-                            })
-                            .setNegativeButton("否", null).show();
-                }
+            public void onClick(View v) {
+                new AlertDialog.Builder(mcontext).setTitle("提示").setCancelable(false).setMessage("确定删除下载任务？")
+                        .setPositiveButton("是", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                TaskInfo task = listData.get(position);
+                                dlManager.deleteTask(task.getTaskID());
+                                listData.remove(position);
+                                ListAdapter.this.notifyDataSetChanged();
+                            }
+                        })
+                        .setNegativeButton("否", null).show();
+            }
 
-            });
+        });
         return convertView;
     }
 
@@ -201,6 +201,10 @@ public class ListAdapter extends BaseAdapter {
                         Toast.makeText(mcontext,taskInfo.getFileName()+"下载失败",Toast.LENGTH_LONG).show();
                     }else if(errorCode>=400){
                         Toast.makeText(mcontext,taskInfo.getFileName()+"网络错误："+errorCode,Toast.LENGTH_LONG).show();
+                    }else if(errorCode==ErrorCode.FILE_SIZE_ZERO){
+                        Toast.makeText(mcontext,taskInfo.getFileName()+"获取文件信息异常",Toast.LENGTH_LONG).show();
+                    }else{
+                        Toast.makeText(mcontext,taskInfo.getFileName()+"无法开始任务",Toast.LENGTH_LONG).show();
                     }
 
                     break;

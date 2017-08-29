@@ -4,12 +4,10 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.widget.ListView;
 
 import zengrun.com.mydownloader.database.DownloadInfo;
 import zengrun.com.mydownloader.download.DLManager;
-import zengrun.com.mydownloader.download.DLService;
 
 /**
  * 已完成任务列表
@@ -27,7 +25,7 @@ public class FinishedActivity extends AppCompatActivity {
         this.setContentView(R.layout.activity_finished);
 
         finishedListView = (ListView)findViewById(R.id.finishedListView);
-        manager = DLService.getDLManager();
+        manager = DLManager.getInstance(FinishedActivity.this);
         adapter = new FinishedAdapter(FinishedActivity.this,manager);
         adapter.setRedownloadClickListener(new FinishedAdapter.RedownloadClickListener() {
             @Override

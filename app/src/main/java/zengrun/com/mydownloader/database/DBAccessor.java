@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created by zengrun on 2017/8/21.
+ * Created by ZR on 2017/8/27.
  */
 
 public class DBAccessor {
@@ -20,7 +20,7 @@ public class DBAccessor {
         this.dbhelper = new DBHelper(context);
     }
     /**
-     * 保存下载任务到数据库
+     * 淇濆瓨涓嬭浇浠诲姟鍒版暟鎹簱
      * @param downloadInfo
      */
     public void saveDownLoadInfo(DownloadInfo downloadInfo){
@@ -31,6 +31,12 @@ public class DBAccessor {
         cv.put("filePath", downloadInfo.getFilePath());
         cv.put("fileSize", downloadInfo.getFileSize());
         cv.put("url", downloadInfo.getUrl());
+        cv.put("start1",downloadInfo.getStart1());
+        cv.put("start2",downloadInfo.getStart2());
+        cv.put("start3",downloadInfo.getStart3());
+        cv.put("end1",downloadInfo.getEnd1());
+        cv.put("end2",downloadInfo.getEnd2());
+        cv.put("end3",downloadInfo.getEnd3());
         Cursor cursor = null;
         try{
             db = dbhelper.getWritableDatabase();
@@ -46,7 +52,7 @@ public class DBAccessor {
             db.close();
         }catch(Exception e){
             doSaveTimes ++;
-            if(doSaveTimes < 5){ //最多尝试5次
+            if(doSaveTimes < 5){ //鏈€澶氬皾璇?娆?
                 saveDownLoadInfo(downloadInfo);
             }else{
                 doSaveTimes = 0;
@@ -66,7 +72,7 @@ public class DBAccessor {
         db = dbhelper.getWritableDatabase();
         Cursor cursor = db.rawQuery(
                 "SELECT * from " + DBHelper.TABLE_NAME
-                        + "WHERE taskID = ? ", new String[]{taskID});
+                        + " WHERE taskID = ? ", new String[]{taskID});
         if(cursor.moveToNext()){
             downloadinfo = new DownloadInfo();
             downloadinfo.setDownloadSize(cursor.getLong(cursor.getColumnIndex("downLoadSize")));
@@ -75,6 +81,12 @@ public class DBAccessor {
             downloadinfo.setFileSize(cursor.getLong(cursor.getColumnIndex("fileSize")));
             downloadinfo.setUrl(cursor.getString(cursor.getColumnIndex("url")));
             downloadinfo.setTaskID(cursor.getString(cursor.getColumnIndex("taskID")));
+            downloadinfo.setStart1(cursor.getLong(cursor.getColumnIndex("start1")));
+            downloadinfo.setStart2(cursor.getLong(cursor.getColumnIndex("start2")));
+            downloadinfo.setStart3(cursor.getLong(cursor.getColumnIndex("start3")));
+            downloadinfo.setEnd1(cursor.getLong(cursor.getColumnIndex("end1")));
+            downloadinfo.setEnd2(cursor.getLong(cursor.getColumnIndex("end2")));
+            downloadinfo.setEnd3(cursor.getLong(cursor.getColumnIndex("end3")));
         }
         cursor.close();
         db.close();
@@ -94,6 +106,12 @@ public class DBAccessor {
             downloadinfo.setFileSize(cursor.getLong(cursor.getColumnIndex("fileSize")));
             downloadinfo.setUrl(cursor.getString(cursor.getColumnIndex("url")));
             downloadinfo.setTaskID(cursor.getString(cursor.getColumnIndex("taskID")));
+            downloadinfo.setStart1(cursor.getLong(cursor.getColumnIndex("start1")));
+            downloadinfo.setStart2(cursor.getLong(cursor.getColumnIndex("start2")));
+            downloadinfo.setStart3(cursor.getLong(cursor.getColumnIndex("start3")));
+            downloadinfo.setEnd1(cursor.getLong(cursor.getColumnIndex("end1")));
+            downloadinfo.setEnd2(cursor.getLong(cursor.getColumnIndex("end2")));
+            downloadinfo.setEnd3(cursor.getLong(cursor.getColumnIndex("end3")));
             list.add(downloadinfo);
         }
         cursor.close();
@@ -115,14 +133,14 @@ public class DBAccessor {
     }
 
     /**
-     * 获取所有已完成的任务
+     * 鑾峰彇鎵€鏈夊凡瀹屾垚鐨勪换鍔?
      * @return
      */
     public List<DownloadInfo> getAllFinished(){
         List<DownloadInfo> list = new ArrayList<>();
         db = dbhelper.getWritableDatabase();
         Cursor cursor = db.rawQuery("SELECT * from " + DBHelper.TABLE_NAME +
-                                    " WHERE downLoadSize=fileSize and fileSize>0", null);
+                " WHERE downLoadSize=fileSize and fileSize>0", null);
         while(cursor.moveToNext()){
             DownloadInfo downloadinfo = new DownloadInfo();
             downloadinfo.setDownloadSize(cursor.getLong(cursor.getColumnIndex("downLoadSize")));

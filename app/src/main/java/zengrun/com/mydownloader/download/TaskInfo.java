@@ -2,7 +2,7 @@ package zengrun.com.mydownloader.download;
 
 /**
  * 下载任务信息，在列表中展示
- * Created by zengrun on 2017/8/21.
+ * Created by zengrun on 2017/8/22.
  */
 
 public class TaskInfo {
