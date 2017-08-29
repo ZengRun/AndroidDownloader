@@ -94,25 +94,25 @@ public class DLWorker {
         if(downLoadThreads!=null){
             Log.v(TAG,"下载暂停，存储断点信息");
             onDownload = false;
-            for(int i=0;i<downLoadThreads.length;i++){
-                downLoadThreads[i].stopDownLoad();
-                pool.remove(downLoadThreads[i]);
-            }
-            saveDownloadInfo();
-            for(int i=0;i<downLoadThreads.length;i++){
-                downLoadThreads[i]=null;
-            }
 
-//            for(int i=0;i<THREADS_PER_TASK;i++){
+//            for(int i=0;i<downLoadThreads.length;i++){
 //                downLoadThreads[i].stopDownLoad();
 //                pool.remove(downLoadThreads[i]);
 //            }
-//            while(!(downLoadThreads[0].isDead&&downLoadThreads[1].isDead&&downLoadThreads[2].isDead)){}
-//
 //            saveDownloadInfo();
-//            for(int i=0;i<THREADS_PER_TASK;i++){
+//            for(int i=0;i<downLoadThreads.length;i++){
 //                downLoadThreads[i]=null;
 //            }
+
+            for(int i=0;i<THREADS_PER_TASK;i++){
+                downLoadThreads[i].stopDownLoad();
+            }
+            while(!(downLoadThreads[0].isDead&&downLoadThreads[1].isDead&&downLoadThreads[2].isDead)){}
+            saveDownloadInfo();
+            for(int i=0;i<THREADS_PER_TASK;i++){
+                pool.remove(downLoadThreads[i]);
+                downLoadThreads[i]=null;
+            }
 
             downLoadThreads=null;
             handler.sendEmptyMessage(TASK_STOP);
@@ -299,7 +299,7 @@ public class DLWorker {
      * 下载线程
      */
     class DownLoadThread extends Thread{
-        public boolean isDead = false;
+        public volatile boolean isDead;
         private boolean isdownloading;
         private URL url;
         private HttpURLConnection conn;
@@ -313,6 +313,7 @@ public class DLWorker {
             this.start = start;
             this.end = end;
             isdownloading = true;
+            this.isDead = false;
         }
 
         @Override
@@ -340,12 +341,11 @@ public class DLWorker {
                         subTaskDownloadSize +=length;  //更新当前线程下载量
                         synchronized (DLWorker.this){
                             downloadedSize += length; //更新文件全局下载量
-                            //Log.v(TAG,"##########"+downloadedSize+"########"+fileSize+"####"+length);
-                            int nowProgress = (int)((100 * downloadedSize)/fileSize);
-                            if(nowProgress > progress){
-                                progress = nowProgress;
-                                handler.sendEmptyMessage(TASK_PROGESS);
-                            }
+                        }
+                        int nowProgress = (int)((100 * downloadedSize)/fileSize);
+                        if(nowProgress > progress){
+                            progress = nowProgress;
+                            handler.sendEmptyMessage(TASK_PROGESS);
                         }
                     }
                     Log.v(TAG,"############"+subTaskDownloadSize);
@@ -424,7 +424,8 @@ public class DLWorker {
                     }
                 }
             }
-            isDead = true;
+            //Log.v(TAG,"#####线程退出！");
+            this.isDead = true;
         }
 
         public void stopDownLoad(){
