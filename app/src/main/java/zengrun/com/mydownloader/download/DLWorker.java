@@ -94,7 +94,6 @@ public class DLWorker {
         if(downLoadThreads!=null){
             Log.v(TAG,"下载暂停，存储断点信息");
             onDownload = false;
-
 //            for(int i=0;i<downLoadThreads.length;i++){
 //                downLoadThreads[i].stopDownLoad();
 //                pool.remove(downLoadThreads[i]);
@@ -348,8 +347,7 @@ public class DLWorker {
                             handler.sendEmptyMessage(TASK_PROGESS);
                         }
                     }
-                    Log.v(TAG,"############"+subTaskDownloadSize);
-                    Log.v(TAG,"############downloadsize:"+downloadedSize);
+                    Log.v(TAG,"############"+subTaskDownloadSize+"-downloadsize:"+downloadedSize);
                     //下载完
                     if(downloadedSize == fileSize){ //最后一个完成的线程去转移文件和存数据库。
                         Log.v(TAG,"##################最后一个线程下载完成！！！");
@@ -375,13 +373,14 @@ public class DLWorker {
                         if(isSupportBreakpoint){
                             downloadTimes++;
                             if(downloadTimes >= maxDownloadTimes){
-                                for(int i =0;i<THREADS_PER_TASK;i++){
-                                    downLoadThreads[i].stopDownLoad();
-                                    pool.remove(downLoadThreads[i]);
-                                }
-                                saveDownloadInfo();
-                                downLoadThreads = null;
-                                onDownload = false;
+                                //for(int i =0;i<THREADS_PER_TASK;i++){
+                                //    downLoadThreads[i].stopDownLoad();
+                                //    pool.remove(downLoadThreads[i]);
+                                //}
+                                //if(downloadedSize>0)
+                                //    saveDownloadInfo();
+                                //downLoadThreads = null;
+                                //onDownload = false;
                                 Message msg = new Message();
                                 msg.what= TASK_ERROR;
                                 msg.arg1 = ErrorCode.DOWNLOAD_ERROR;
@@ -453,7 +452,7 @@ public class DLWorker {
                 urlConn.setConnectTimeout(5000);
                 urlConn.setReadTimeout(10000);
                 int code = urlConn.getResponseCode();
-                if(code==HttpURLConnection.HTTP_MOVED_TEMP){
+                while(code==HttpURLConnection.HTTP_MOVED_TEMP){
                     Log.v(TAG,"302:redirect");
                     String redirect = urlConn.getHeaderField("Location");
                     Log.v(TAG,"######redirect to: "+redirect);
@@ -467,9 +466,10 @@ public class DLWorker {
                     }
                     urlConn.setConnectTimeout(5000);
                     urlConn.setReadTimeout(10000);
+                    code = urlConn.getResponseCode();
                 }
                 if(code>=400){
-                    Log.e(TAG,"request error happened:"+code);
+                    Log.e(TAG,"#######request error happened:"+code);
                     statusCode = code;
                     return;
                 }
@@ -510,10 +510,10 @@ public class DLWorker {
                     return;
                 }
             } catch (MalformedURLException e) {
-                statusCode=ErrorCode.OTHERS;
+                statusCode=ErrorCode.MALFORMED_URL;
                 e.printStackTrace();
             } catch (IOException e) {
-                statusCode=ErrorCode.OTHERS;
+                statusCode=ErrorCode.ILLEGAL_FILENAME;
                 e.printStackTrace();
             } catch (Exception e) {
                 statusCode=ErrorCode.OTHERS;

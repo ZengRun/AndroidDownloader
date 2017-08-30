@@ -9,5 +9,7 @@ public class ErrorCode {
     public static final int DOWNLOAD_ERROR = 2;
     public static final int HTTP_CONN_ERROR = 3;
     public static final int FILE_SIZE_ZERO = 4;
-    public static final int OTHERS = 5;
+    public static final int MALFORMED_URL = 5;
+    public static final int ILLEGAL_FILENAME = 6;
+    public static final int OTHERS = 7;
 }

@@ -196,17 +196,27 @@ public class ListAdapter extends BaseAdapter {
             for(TaskInfo taskInfo : listData){
                 if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
                     taskInfo.setOnDownloading(false);
-                    ListAdapter.this.notifyDataSetChanged();
                     if(errorCode==1||errorCode==2){
                         Toast.makeText(mcontext,taskInfo.getFileName()+"下载失败",Toast.LENGTH_LONG).show();
                     }else if(errorCode>=400){
                         Toast.makeText(mcontext,taskInfo.getFileName()+"网络错误："+errorCode,Toast.LENGTH_LONG).show();
                     }else if(errorCode==ErrorCode.FILE_SIZE_ZERO){
                         Toast.makeText(mcontext,taskInfo.getFileName()+"获取文件信息异常",Toast.LENGTH_LONG).show();
+                    }else if(errorCode==ErrorCode.MALFORMED_URL){
+                        Toast.makeText(mcontext,"错误的URL连接",Toast.LENGTH_LONG).show();
+                    }else if(errorCode==ErrorCode.ILLEGAL_FILENAME){
+                        Toast.makeText(mcontext,"非法的文件名",Toast.LENGTH_LONG).show();
                     }else{
-                        Toast.makeText(mcontext,taskInfo.getFileName()+"无法开始任务",Toast.LENGTH_LONG).show();
+                        Toast.makeText(mcontext,taskInfo.getFileName()+"未知错误，请删除任务重试",Toast.LENGTH_LONG).show();
                     }
 
+                    if(downloadInfo.getDownloadSize()==0){//还没开始下载，删除条目
+                        listData.remove(taskInfo);
+                        dlManager.deleteTask(taskInfo.getTaskID());//并删除下载任务
+                    }else{
+                        dlManager.stopTask(taskInfo.getTaskID());//如果是下载到一半出错则暂停任务并保存断点
+                    }
+                    ListAdapter.this.notifyDataSetChanged();
                     break;
                 }
             }
