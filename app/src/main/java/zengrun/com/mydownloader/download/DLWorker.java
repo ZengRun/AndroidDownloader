@@ -513,7 +513,7 @@ public class DLWorker {
                 statusCode=ErrorCode.MALFORMED_URL;
                 e.printStackTrace();
             } catch (IOException e) {
-                statusCode=ErrorCode.ILLEGAL_FILENAME;
+                statusCode=ErrorCode.FILE_ERROR;
                 e.printStackTrace();
             } catch (Exception e) {
                 statusCode=ErrorCode.OTHERS;

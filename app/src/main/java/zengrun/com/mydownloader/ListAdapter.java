@@ -204,8 +204,8 @@ public class ListAdapter extends BaseAdapter {
                         Toast.makeText(mcontext,taskInfo.getFileName()+"获取文件信息异常",Toast.LENGTH_LONG).show();
                     }else if(errorCode==ErrorCode.MALFORMED_URL){
                         Toast.makeText(mcontext,"错误的URL连接",Toast.LENGTH_LONG).show();
-                    }else if(errorCode==ErrorCode.ILLEGAL_FILENAME){
-                        Toast.makeText(mcontext,"非法的文件名",Toast.LENGTH_LONG).show();
+                    }else if(errorCode==ErrorCode.FILE_ERROR){
+                        Toast.makeText(mcontext,"创建文件异常，请检查文件名并打开应用SD卡读写权限",Toast.LENGTH_LONG).show();
                     }else{
                         Toast.makeText(mcontext,taskInfo.getFileName()+"未知错误，请删除任务重试",Toast.LENGTH_LONG).show();
                     }

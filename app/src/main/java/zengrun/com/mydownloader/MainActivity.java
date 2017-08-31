@@ -1,9 +1,13 @@
 package zengrun.com.mydownloader;
 
+import android.Manifest;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -30,12 +34,16 @@ public class MainActivity extends AppCompatActivity {
     private ListAdapter adapter;
     private DLManager manager;
 
+    private static final int MY_PERMISSION_REQUEST_CODE = 9999;
+
     private final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.activity_main);
+
+
 
         addButton = (ImageButton)this.findViewById(R.id.button);
         listview = (ListView)this.findViewById(R.id.listView);
@@ -89,6 +97,12 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(intent,1);
             }
         });
+
+        //动态授权
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED){
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, MY_PERMISSION_REQUEST_CODE);
+        }
     }
 
 
