@@ -12,6 +12,8 @@ import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -300,7 +302,6 @@ public class DLWorker {
     class DownLoadThread extends Thread{
         public volatile boolean isDead;
         private boolean isdownloading;
-        private URL url;
         private HttpURLConnection conn;
         private InputStream inputStream;
         RandomAccessFile accessFile;
@@ -319,7 +320,7 @@ public class DLWorker {
         public void run() {
             while(downloadTimes < maxDownloadTimes){ //做3次请求的尝试
                 try {
-                    url = new URL(downloadInfo.getUrl());
+                    URL url = new URL(downloadInfo.getUrl());
                     if(downloadInfo.getUrl().startsWith("https")){
                         SslUtils.ignoreSsl();
                         conn = (HttpsURLConnection)url.openConnection();
@@ -330,13 +331,15 @@ public class DLWorker {
                     conn.setReadTimeout(10000);
 
                     accessFile = new RandomAccessFile (TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(),"rwd");
-                    accessFile.seek(start);
+                    MappedByteBuffer mbb = accessFile.getChannel().map(FileChannel.MapMode.READ_WRITE,start,end-start+1);
+                    //accessFile.seek(start);
                     conn.setRequestProperty("Range", "bytes=" + start + "-" + end);
                     inputStream = conn.getInputStream();
                     byte[] buffer = new byte[1024 * 4];
-                    int length = -1;
+                    int length;
                     while((length = inputStream.read(buffer)) != -1 && isdownloading){
-                        accessFile.write(buffer, 0, length);
+                        //accessFile.write(buffer, 0, length);
+                        mbb.put(buffer,0,length);
                         subTaskDownloadSize +=length;  //更新当前线程下载量
                         synchronized (DLWorker.this){
                             downloadedSize += length; //更新文件全局下载量
@@ -347,6 +350,7 @@ public class DLWorker {
                             handler.sendEmptyMessage(TASK_PROGESS);
                         }
                     }
+                    mbb.force();
                     Log.v(TAG,"############"+subTaskDownloadSize+"-downloadsize:"+downloadedSize);
                     //下载完
                     if(downloadedSize == fileSize){ //最后一个完成的线程去转移文件和存数据库。

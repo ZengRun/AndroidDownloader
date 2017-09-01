@@ -50,7 +50,7 @@ public class DLManager {
         downloadSuccess = new DownloadSuccess() {
             @Override
             public void  onTaskSuccess(String TaskID) {
-                synchronized (workerList) {
+                //synchronized (workerList) {
                     int size = workerList.size();
                     for (int i = 0; i < size; i++) {
                         DLWorker downloader = workerList.get(i);
@@ -59,7 +59,7 @@ public class DLManager {
                             return;
                         }
                     }
-                }
+                //}
             }
         };
         recoverData(mycontext);
