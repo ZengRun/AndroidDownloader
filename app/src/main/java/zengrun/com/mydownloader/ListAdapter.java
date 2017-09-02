@@ -18,6 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import zengrun.com.mydownloader.database.DownloadInfo;
@@ -134,11 +135,16 @@ public class ListAdapter extends BaseAdapter {
 
     class CheckedChangeListener implements CompoundButton.OnCheckedChangeListener {
         int position;
+        //static final int MIN_CLICK_DELAY_TIME = 1000;
+        //long lastClickTime = 0;
         public CheckedChangeListener(int position){
             this.position = position;
         }
         @Override
         public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+            //long curTime = Calendar.getInstance().getTimeInMillis();
+            //if(curTime-lastClickTime<MIN_CLICK_DELAY_TIME) //防止过快点击
+            //    return;
             if(isChecked){
                 // 继续下载
                 Log.v(TAG,"用户点击-继续下载");
@@ -150,6 +156,7 @@ public class ListAdapter extends BaseAdapter {
                 listData.get(position).setOnDownloading(false);
                 dlManager.stopTask(listData.get(position).getTaskID());
             }
+            //lastClickTime = curTime;
             ListAdapter.this.notifyDataSetChanged();
         }
     }

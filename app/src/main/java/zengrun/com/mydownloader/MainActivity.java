@@ -127,6 +127,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        manager.stopAllTask();
+    }
+
     /**
      * 获取文件状态
      * @param TaskID 任务号

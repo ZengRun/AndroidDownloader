@@ -320,6 +320,11 @@ public class DLWorker {
         public void run() {
             while(downloadTimes < maxDownloadTimes){ //做3次请求的尝试
                 try {
+                    if(start>end) {
+                        Log.v(TAG,"#####该线程任务已完成，直接退出");
+                        isDead = true;
+                        return;
+                    }
                     URL url = new URL(downloadInfo.getUrl());
                     if(downloadInfo.getUrl().startsWith("https")){
                         SslUtils.ignoreSsl();
@@ -327,6 +332,7 @@ public class DLWorker {
                     }else{
                         conn = (HttpURLConnection)url.openConnection();
                     }
+                    conn.setRequestMethod("GET");
                     conn.setConnectTimeout(5000);
                     conn.setReadTimeout(10000);
 
