@@ -492,6 +492,7 @@ public class DLWorker {
                     downLoadThreads[1] = new DownLoadThread(di.getStart2(),di.getEnd2());
                     downLoadThreads[2] = new DownLoadThread(di.getStart3(),di.getEnd3());
                     downloadedSize = di.getDownloadSize();
+                    fileSize = di.getFileSize();
                     return;
                 }
 

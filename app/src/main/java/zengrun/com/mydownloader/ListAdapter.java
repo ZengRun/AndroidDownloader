@@ -3,6 +3,7 @@ package zengrun.com.mydownloader;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.support.v4.content.res.ResourcesCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -71,7 +72,8 @@ public class ListAdapter extends BaseAdapter {
             holder.fileName = (TextView)convertView.findViewById(R.id.file_name);
             holder.textProgress = (TextView)convertView.findViewById(R.id.file_size);
             holder.fileProgress = (ProgressBar)convertView.findViewById(R.id.progressbar);
-            holder.downloadIcon = (CheckBox)convertView.findViewById(R.id.checkbox);
+            //holder.downloadIcon = (CheckBox)convertView.findViewById(R.id.checkbox);
+            holder.downloadIcon = (ImageButton)convertView.findViewById(R.id.change);
             holder.deleteButton = (ImageButton)convertView.findViewById(R.id.delButton);
             convertView.setTag(holder);
         }else{
@@ -80,11 +82,17 @@ public class ListAdapter extends BaseAdapter {
         holder.fileName.setText(listData.get(position).getFileName());
         holder.fileProgress.setProgress(listData.get(position).getProgress());
         holder.textProgress.setText(listData.get(position).getProgress() + "%");
-        holder.downloadIcon.setOnCheckedChangeListener(new CheckedChangeListener(position));
+//        holder.downloadIcon.setOnCheckedChangeListener(new CheckedChangeListener(position));
+//        if(listData.get(position).isOnDownloading()){
+//            holder.downloadIcon.setChecked(true);
+//        }else{
+//            holder.downloadIcon.setChecked(false);
+//        }
+        holder.downloadIcon.setOnClickListener(new ImageButtonClickListener(position));
         if(listData.get(position).isOnDownloading()){
-            holder.downloadIcon.setChecked(true);
+            holder.downloadIcon.setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.pause, null));
         }else{
-            holder.downloadIcon.setChecked(false);
+            holder.downloadIcon.setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.start, null));
         }
 
         holder.deleteButton.setOnClickListener(new View.OnClickListener() {
@@ -111,7 +119,8 @@ public class ListAdapter extends BaseAdapter {
         TextView fileName = null;
         TextView textProgress = null;
         ProgressBar fileProgress = null;
-        CheckBox downloadIcon = null;
+        //CheckBox downloadIcon = null;
+        ImageButton downloadIcon = null;
         ImageButton deleteButton = null;
     }
 
@@ -133,31 +142,51 @@ public class ListAdapter extends BaseAdapter {
 
 
 
-    class CheckedChangeListener implements CompoundButton.OnCheckedChangeListener {
+//    class CheckedChangeListener implements CompoundButton.OnCheckedChangeListener {
+//        int position;
+//        public CheckedChangeListener(int position){
+//            this.position = position;
+//        }
+//        @Override
+//        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+//            if(isChecked){
+//                // 继续下载
+//                Log.v(TAG,"用户点击-继续下载");
+//                listData.get(position).setOnDownloading(true);
+//                dlManager.startTask(listData.get(position).getTaskID());
+//            }else{
+//                //停止下载
+//                Log.v(TAG,"用户点击-暂停下载");
+//                listData.get(position).setOnDownloading(false);
+//                dlManager.stopTask(listData.get(position).getTaskID());
+//            }
+//            ListAdapter.this.notifyDataSetChanged();
+//        }
+//    }
+
+    class ImageButtonClickListener implements View.OnClickListener{
         int position;
-        //static final int MIN_CLICK_DELAY_TIME = 1000;
-        //long lastClickTime = 0;
-        public CheckedChangeListener(int position){
+        static final int MIN_CLICK_DELAY_TIME = 1000;
+        long lastClickTime = 0;
+        public ImageButtonClickListener(int position){
             this.position = position;
         }
         @Override
-        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-            //long curTime = Calendar.getInstance().getTimeInMillis();
-            //if(curTime-lastClickTime<MIN_CLICK_DELAY_TIME) //防止过快点击
-            //    return;
-            if(isChecked){
-                // 继续下载
-                Log.v(TAG,"用户点击-继续下载");
-                listData.get(position).setOnDownloading(true);
-                dlManager.startTask(listData.get(position).getTaskID());
-            }else{
-                //停止下载
+        public void onClick(View v) {
+            long currentTime = Calendar.getInstance().getTimeInMillis();
+            if(currentTime-lastClickTime<MIN_CLICK_DELAY_TIME) return;
+            if(listData.get(position).isOnDownloading()){
                 Log.v(TAG,"用户点击-暂停下载");
                 listData.get(position).setOnDownloading(false);
+                ((ImageButton)v).setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.start, null));
                 dlManager.stopTask(listData.get(position).getTaskID());
+            }else{
+                Log.v(TAG,"用户点击-继续下载");
+                listData.get(position).setOnDownloading(true);
+                ((ImageButton)v).setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.pause, null));
+                dlManager.startTask(listData.get(position).getTaskID());
             }
-            //lastClickTime = curTime;
-            ListAdapter.this.notifyDataSetChanged();
+            lastClickTime = currentTime;
         }
     }
 

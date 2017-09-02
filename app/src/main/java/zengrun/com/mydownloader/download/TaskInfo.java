@@ -6,7 +6,7 @@ package zengrun.com.mydownloader.download;
  */
 
 public class TaskInfo {
-    private boolean isOnDownloading;
+    private volatile boolean isOnDownloading;
     private String taskID;
     private String fileName;
     private long fileSize = 0;
