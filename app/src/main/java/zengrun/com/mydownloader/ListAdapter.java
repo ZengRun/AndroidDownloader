@@ -25,6 +25,8 @@ import java.util.List;
 import zengrun.com.mydownloader.database.DownloadInfo;
 import zengrun.com.mydownloader.download.DLListener;
 import zengrun.com.mydownloader.download.DLManager;
+import zengrun.com.mydownloader.download.StartThread;
+import zengrun.com.mydownloader.download.StopThread;
 import zengrun.com.mydownloader.download.TaskInfo;
 
 /**
@@ -174,17 +176,23 @@ public class ListAdapter extends BaseAdapter {
         @Override
         public void onClick(View v) {
             long currentTime = Calendar.getInstance().getTimeInMillis();
-            if(currentTime-lastClickTime<MIN_CLICK_DELAY_TIME) return;
+
+            if(currentTime-lastClickTime<MIN_CLICK_DELAY_TIME) {
+                //lastClickTime = currentTime;
+                return;
+            }
             if(listData.get(position).isOnDownloading()){
                 Log.v(TAG,"用户点击-暂停下载");
                 listData.get(position).setOnDownloading(false);
                 ((ImageButton)v).setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.start, null));
-                dlManager.stopTask(listData.get(position).getTaskID());
+                //dlManager.stopTask(listData.get(position).getTaskID());
+                new StopThread(dlManager,listData.get(position).getTaskID()).start();
             }else{
                 Log.v(TAG,"用户点击-继续下载");
                 listData.get(position).setOnDownloading(true);
                 ((ImageButton)v).setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.pause, null));
-                dlManager.startTask(listData.get(position).getTaskID());
+                //dlManager.startTask(listData.get(position).getTaskID());
+                new StartThread(dlManager,listData.get(position).getTaskID()).start();
             }
             lastClickTime = currentTime;
         }
