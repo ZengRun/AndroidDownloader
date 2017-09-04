@@ -3,15 +3,14 @@ package zengrun.com.mydownloader;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v4.content.res.ResourcesCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
@@ -23,7 +22,6 @@ import java.util.Calendar;
 import java.util.List;
 
 import zengrun.com.mydownloader.database.DownloadInfo;
-import zengrun.com.mydownloader.download.DLListener;
 import zengrun.com.mydownloader.download.DLManager;
 import zengrun.com.mydownloader.download.StartThread;
 import zengrun.com.mydownloader.download.StopThread;
@@ -47,7 +45,7 @@ public class ListAdapter extends BaseAdapter {
         this.dlManager = dlManager;
         listData = dlManager.getAllTask();
         this.listView = listView;
-        dlManager.setAllTaskListener(new DownloadManagerListener());
+        dlManager.setAllTaskHandler(handler);
     }
 
     @Override
@@ -74,7 +72,6 @@ public class ListAdapter extends BaseAdapter {
             holder.fileName = (TextView)convertView.findViewById(R.id.file_name);
             holder.textProgress = (TextView)convertView.findViewById(R.id.file_size);
             holder.fileProgress = (ProgressBar)convertView.findViewById(R.id.progressbar);
-            //holder.downloadIcon = (CheckBox)convertView.findViewById(R.id.checkbox);
             holder.downloadIcon = (ImageButton)convertView.findViewById(R.id.change);
             holder.deleteButton = (ImageButton)convertView.findViewById(R.id.delButton);
             convertView.setTag(holder);
@@ -84,12 +81,6 @@ public class ListAdapter extends BaseAdapter {
         holder.fileName.setText(listData.get(position).getFileName());
         holder.fileProgress.setProgress(listData.get(position).getProgress());
         holder.textProgress.setText(listData.get(position).getProgress() + "%");
-//        holder.downloadIcon.setOnCheckedChangeListener(new CheckedChangeListener(position));
-//        if(listData.get(position).isOnDownloading()){
-//            holder.downloadIcon.setChecked(true);
-//        }else{
-//            holder.downloadIcon.setChecked(false);
-//        }
         holder.downloadIcon.setOnClickListener(new ImageButtonClickListener(position));
         if(listData.get(position).isOnDownloading()){
             holder.downloadIcon.setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.pause, null));
@@ -121,7 +112,6 @@ public class ListAdapter extends BaseAdapter {
         TextView fileName = null;
         TextView textProgress = null;
         ProgressBar fileProgress = null;
-        //CheckBox downloadIcon = null;
         ImageButton downloadIcon = null;
         ImageButton deleteButton = null;
     }
@@ -144,28 +134,6 @@ public class ListAdapter extends BaseAdapter {
 
 
 
-//    class CheckedChangeListener implements CompoundButton.OnCheckedChangeListener {
-//        int position;
-//        public CheckedChangeListener(int position){
-//            this.position = position;
-//        }
-//        @Override
-//        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-//            if(isChecked){
-//                // 继续下载
-//                Log.v(TAG,"用户点击-继续下载");
-//                listData.get(position).setOnDownloading(true);
-//                dlManager.startTask(listData.get(position).getTaskID());
-//            }else{
-//                //停止下载
-//                Log.v(TAG,"用户点击-暂停下载");
-//                listData.get(position).setOnDownloading(false);
-//                dlManager.stopTask(listData.get(position).getTaskID());
-//            }
-//            ListAdapter.this.notifyDataSetChanged();
-//        }
-//    }
-
     class ImageButtonClickListener implements View.OnClickListener{
         int position;
         static final int MIN_CLICK_DELAY_TIME = 1000;
@@ -185,13 +153,11 @@ public class ListAdapter extends BaseAdapter {
                 Log.v(TAG,"用户点击-暂停下载");
                 listData.get(position).setOnDownloading(false);
                 ((ImageButton)v).setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.start, null));
-                //dlManager.stopTask(listData.get(position).getTaskID());
                 new StopThread(dlManager,listData.get(position).getTaskID()).start();
             }else{
                 Log.v(TAG,"用户点击-继续下载");
                 listData.get(position).setOnDownloading(true);
                 ((ImageButton)v).setImageDrawable(ResourcesCompat.getDrawable(mcontext.getResources(), R.mipmap.pause, null));
-                //dlManager.startTask(listData.get(position).getTaskID());
                 new StartThread(dlManager,listData.get(position).getTaskID()).start();
             }
             lastClickTime = currentTime;
@@ -199,72 +165,82 @@ public class ListAdapter extends BaseAdapter {
     }
 
 
-    private class DownloadManagerListener implements DLListener {
+    public Handler handler = new Handler(){
         @Override
-        public void onStart(DownloadInfo downloadInfo) {}
-
-        @Override
-        public void onProgress(DownloadInfo downloadInfo, boolean isSupportBreakpoint) {
-            //根据监听到的信息查找列表相对应的任务，更新相应任务的进度
-            for(int i = 0;i<listData.size();i++){
-                TaskInfo taskInfo = listData.get(i);
-                if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
-                    taskInfo.setDownFileSize(downloadInfo.getDownloadSize());
-                    taskInfo.setFileSize(downloadInfo.getFileSize());
-                    updateItem(i,taskInfo);
-                    break;
-                }
-            }
-
-        }
-
-        @Override
-        public void onStop(DownloadInfo downloadInfo, boolean isSupportBreakpoint) {}
-
-        @Override
-        public void onSuccess(DownloadInfo downloadInfo) {
-            //根据监听到的信息查找列表相对应的任务，删除对应的任务
-            for(TaskInfo taskInfo : listData){
-                if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
-                    listData.remove(taskInfo);
-                    ListAdapter.this.notifyDataSetChanged();
-                    Toast.makeText(mcontext,taskInfo.getFileName()+"下载完成！！",Toast.LENGTH_LONG).show();
-                    break;
-                }
+        public void handleMessage(Message msg) {
+            // TODO Auto-generated method stub
+            if(msg.what == MessageType.TASK_START){ //开始下载
+                start((DownloadInfo) msg.obj);
+            }else if(msg.what == MessageType.TASK_STOP){ //停止下载
+                stop((DownloadInfo) msg.obj);
+            }else if(msg.what == MessageType.TASK_PROGRESS){ //改变进程
+                progress((DownloadInfo)msg.obj);
+            }else if(msg.what == MessageType.TASK_ERROR){ //下载出错
+                error((DownloadInfo)msg.obj,msg.arg1);
+            }else if(msg.what == MessageType.TASK_SUCCESS){ //下载完成
+                success((DownloadInfo)msg.obj);
             }
         }
+    };
 
-        @Override
-        public void onError(DownloadInfo downloadInfo,int errorCode) {
-            //根据监听到的信息查找列表相对应的任务，停止该任务
-            for(TaskInfo taskInfo : listData){
-                if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
-                    taskInfo.setOnDownloading(false);
-                    if(errorCode==1||errorCode==2){
-                        Toast.makeText(mcontext,taskInfo.getFileName()+"下载失败",Toast.LENGTH_LONG).show();
-                    }else if(errorCode>=400){
-                        Toast.makeText(mcontext,taskInfo.getFileName()+"网络错误："+errorCode,Toast.LENGTH_LONG).show();
-                    }else if(errorCode==ErrorCode.FILE_SIZE_ZERO){
-                        Toast.makeText(mcontext,taskInfo.getFileName()+"获取文件信息异常",Toast.LENGTH_LONG).show();
-                    }else if(errorCode==ErrorCode.MALFORMED_URL){
-                        Toast.makeText(mcontext,"错误的URL连接",Toast.LENGTH_LONG).show();
-                    }else if(errorCode==ErrorCode.FILE_ERROR){
-                        Toast.makeText(mcontext,"创建文件异常，请检查文件名并打开应用SD卡读写权限",Toast.LENGTH_LONG).show();
-                    }else{
-                        Toast.makeText(mcontext,taskInfo.getFileName()+"未知错误，请删除任务重试",Toast.LENGTH_LONG).show();
-                    }
-
-                    if(downloadInfo.getDownloadSize()==0){//还没开始下载，删除条目
-                        listData.remove(taskInfo);
-                        dlManager.deleteTask(taskInfo.getTaskID());//并删除下载任务
-                    }else{
-                        dlManager.stopTask(taskInfo.getTaskID());//如果是下载到一半出错则暂停任务并保存断点
-                    }
-                    ListAdapter.this.notifyDataSetChanged();
-                    break;
-                }
+    private void progress(DownloadInfo downloadInfo){
+        //根据监听到的信息查找列表相对应的任务，更新相应任务的进度
+        for(int i = 0;i<listData.size();i++){
+            TaskInfo taskInfo = listData.get(i);
+            if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
+                taskInfo.setDownFileSize(downloadInfo.getDownloadSize());
+                taskInfo.setFileSize(downloadInfo.getFileSize());
+                updateItem(i,taskInfo);
+                break;
             }
         }
     }
+
+    private void success(DownloadInfo downloadInfo){
+        //根据监听到的信息查找列表相对应的任务，删除对应的任务
+        for(TaskInfo taskInfo : listData){
+            if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
+                listData.remove(taskInfo);
+                ListAdapter.this.notifyDataSetChanged();
+                Toast.makeText(mcontext,taskInfo.getFileName()+"下载完成！！",Toast.LENGTH_LONG).show();
+                break;
+            }
+        }
+    }
+
+    private void error(DownloadInfo downloadInfo,int errorCode){
+        //根据监听到的信息查找列表相对应的任务，停止该任务
+        for(TaskInfo taskInfo : listData){
+            if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
+                taskInfo.setOnDownloading(false);
+                if(errorCode==1||errorCode==2){
+                    Toast.makeText(mcontext,taskInfo.getFileName()+"下载失败",Toast.LENGTH_LONG).show();
+                }else if(errorCode>=400){
+                    Toast.makeText(mcontext,taskInfo.getFileName()+"网络错误："+errorCode,Toast.LENGTH_LONG).show();
+                }else if(errorCode==ErrorCode.FILE_SIZE_ZERO){
+                    Toast.makeText(mcontext,taskInfo.getFileName()+"获取文件信息异常",Toast.LENGTH_LONG).show();
+                }else if(errorCode==ErrorCode.MALFORMED_URL){
+                    Toast.makeText(mcontext,"错误的URL连接",Toast.LENGTH_LONG).show();
+                }else if(errorCode==ErrorCode.FILE_ERROR){
+                    Toast.makeText(mcontext,"创建文件异常，请检查文件名并打开应用SD卡读写权限",Toast.LENGTH_LONG).show();
+                }else{
+                    Toast.makeText(mcontext,taskInfo.getFileName()+"未知错误，请删除任务重试",Toast.LENGTH_LONG).show();
+                }
+
+                if(downloadInfo.getDownloadSize()==0){//还没开始下载，删除条目
+                    listData.remove(taskInfo);
+                    dlManager.deleteTask(taskInfo.getTaskID());//并删除下载任务
+                }else{
+                    dlManager.stopTask(taskInfo.getTaskID());//如果是下载到一半出错则暂停任务并保存断点
+                }
+                ListAdapter.this.notifyDataSetChanged();
+                break;
+            }
+        }
+    }
+
+    private void start(DownloadInfo downloadInfo){}
+
+    private void stop(DownloadInfo downloadInfo){}
 }
 

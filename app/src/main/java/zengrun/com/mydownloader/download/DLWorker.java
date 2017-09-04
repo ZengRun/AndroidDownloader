@@ -19,6 +19,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import javax.net.ssl.HttpsURLConnection;
 
 import zengrun.com.mydownloader.ErrorCode;
+import zengrun.com.mydownloader.MessageType;
 import zengrun.com.mydownloader.database.DBAccessor;
 import zengrun.com.mydownloader.database.DownloadInfo;
 import zengrun.com.mydownloader.database.FileHelper;
@@ -29,11 +30,6 @@ import zengrun.com.mydownloader.security.SslUtils;
  */
 
 public class DLWorker {
-    private int TASK_START = 0;
-    private int TASK_STOP = 1;
-    private int TASK_PROGESS = 2;
-    private int TASK_ERROR = 3;
-    private int TASK_SUCCESS = 4;
 
     //临时文件路径
     private final String TEMP_DIR = FileHelper.getTempDirPath();
@@ -41,9 +37,7 @@ public class DLWorker {
     private final int maxDownloadTimes = 3;//失败重新请求次数
     private final int THREADS_PER_TASK = 3;//每个任务并发线程数
 
-    private boolean isSupportBreakpoint = false;
     private DBAccessor dbAccessor;
-    private DLListener dlListener;
     private DownloadSuccess downloadsuccess;
     private DownloadInfo downloadInfo;
     private DownLoadThread[] downLoadThreads;
@@ -54,10 +48,9 @@ public class DLWorker {
     private ThreadPoolExecutor pool;
     private RandomAccessFile tmpFile;
     private int progress = -1;
-    private int statusCode = 0;
+    private Handler handler;
 
-    public DLWorker(Context context, DownloadInfo downloadInfo, ThreadPoolExecutor pool, boolean isSupportBreakpoint, boolean isNewTask){
-        this.isSupportBreakpoint = isSupportBreakpoint;
+    public DLWorker(Context context, DownloadInfo downloadInfo, ThreadPoolExecutor pool, boolean isNewTask){
         this.pool = pool;
         fileSize = downloadInfo.getFileSize();
         downloadedSize = downloadInfo.getDownloadSize();
@@ -67,28 +60,7 @@ public class DLWorker {
 
     public void start(){
         if(downLoadThreads==null||downLoadThreads.length==0){
-            BeforeDownloadThread beforeDownloadThread = new BeforeDownloadThread();
-            beforeDownloadThread.start();
-            try {
-                beforeDownloadThread.join();      //让主线程等待
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            if(statusCode==0){
-                downloadTimes = 0;
-                onDownload =true;
-                Log.v(TAG,"file size:"+fileSize+" bytes");
-                Log.v(TAG,"start downloading.....");
-                handler.sendEmptyMessage(TASK_START);
-                for(DownLoadThread thread:downLoadThreads){
-                    pool.execute(thread);
-                }
-            }else{
-                Message msg = new Message();
-                msg.what = TASK_ERROR;
-                msg.arg1 = statusCode;
-                handler.sendMessage(msg);
-            }
+            new BeforeDownloadThread().start();
         }
     }
 
@@ -96,14 +68,6 @@ public class DLWorker {
         if(downLoadThreads!=null){
             Log.v(TAG,"下载暂停，存储断点信息");
             onDownload = false;
-//            for(int i=0;i<downLoadThreads.length;i++){
-//                downLoadThreads[i].stopDownLoad();
-//                pool.remove(downLoadThreads[i]);
-//            }
-//            saveDownloadInfo();
-//            for(int i=0;i<downLoadThreads.length;i++){
-//                downLoadThreads[i]=null;
-//            }
 
             for(int i=0;i<THREADS_PER_TASK;i++){
                 downLoadThreads[i].stopDownLoad();
@@ -114,9 +78,8 @@ public class DLWorker {
                 pool.remove(downLoadThreads[i]);
                 downLoadThreads[i]=null;
             }
-
             downLoadThreads=null;
-            handler.sendEmptyMessage(TASK_STOP);
+            handler.sendEmptyMessage(MessageType.TASK_STOP);
         }
     }
 
@@ -137,13 +100,12 @@ public class DLWorker {
         }
     }
 
-
     public String getTaskID(){
         return downloadInfo.getTaskID();
     }
 
-    public void setDlListener(DLListener dlListener) {
-        this.dlListener = dlListener;
+    public void setTaskHandler(Handler handler){
+        this.handler = handler;
     }
 
     public void setDownLoadSuccess(DownloadSuccess downloadsuccess){
@@ -162,11 +124,6 @@ public class DLWorker {
     public DownloadInfo getSQLDownLoadInfo(){
         downloadInfo.setDownloadSize(downloadedSize);
         return downloadInfo;
-    }
-
-
-    public void setSupportBreakpoint(boolean isSupportBreakpoint) {
-        this.isSupportBreakpoint = isSupportBreakpoint;
     }
 
     /**
@@ -195,95 +152,36 @@ public class DLWorker {
      * 保存下载信息至数据库
      */
     private void saveDownloadInfo(){
-        if(isSupportBreakpoint){
-            downloadInfo.setStart1(downLoadThreads[0].start+downLoadThreads[0].subTaskDownloadSize);
-            downloadInfo.setStart2(downLoadThreads[1].start+downLoadThreads[1].subTaskDownloadSize);
-            downloadInfo.setStart3(downLoadThreads[2].start+downLoadThreads[2].subTaskDownloadSize);
-            downloadInfo.setDownloadSize(downloadedSize);
-            downloadInfo.setEnd1(downLoadThreads[0].end);
-            downloadInfo.setEnd2(downLoadThreads[1].end);
-            downloadInfo.setEnd3(downLoadThreads[2].end);
-            Log.v(TAG,"#####save info:"+downLoadThreads[0].subTaskDownloadSize+"-"+downLoadThreads[1].subTaskDownloadSize+"-"
-                    +downLoadThreads[2].subTaskDownloadSize+" :"+downloadedSize);
-            dbAccessor.saveDownLoadInfo(downloadInfo);
-        }
-    }
-
-    /**
-     * 通知监听器，任务开始
-     */
-    private void startNotice(){
-        if(dlListener!=null){
-            dlListener.onStart(getSQLDownLoadInfo());
-        }
-    }
-
-    /**
-     * 通知监听器，当前进度
-     */
-    private void onProgressNotice(){
-        if(dlListener!=null){
-            dlListener.onProgress(getSQLDownLoadInfo(),isSupportBreakpoint);
-        }
-    }
-
-    /**
-     * 通知监听器，任务停止
-     */
-    private void stopNotice(){
-        if(!isSupportBreakpoint){
-            downloadedSize = 0L;
-        }
-        if(dlListener!=null){
-            dlListener.onStop(getSQLDownLoadInfo(),isSupportBreakpoint);
-        }
-    }
-
-    /**
-     * 通知监听器，任务异常，并停止
-     */
-    private void errorNotice(int errorCode){
-        if(dlListener!=null){
-            dlListener.onError(getSQLDownLoadInfo(),errorCode);
-        }
+        downloadInfo.setStart1(downLoadThreads[0].start+downLoadThreads[0].subTaskDownloadSize);
+        downloadInfo.setStart2(downLoadThreads[1].start+downLoadThreads[1].subTaskDownloadSize);
+        downloadInfo.setStart3(downLoadThreads[2].start+downLoadThreads[2].subTaskDownloadSize);
+        downloadInfo.setDownloadSize(downloadedSize);
+        downloadInfo.setEnd1(downLoadThreads[0].end);
+        downloadInfo.setEnd2(downLoadThreads[1].end);
+        downloadInfo.setEnd3(downLoadThreads[2].end);
+        Log.v(TAG,"#####save info:"+downLoadThreads[0].subTaskDownloadSize+"-"+downLoadThreads[1].subTaskDownloadSize+"-"
+                +downLoadThreads[2].subTaskDownloadSize+" :"+downloadedSize);
+        dbAccessor.saveDownLoadInfo(downloadInfo);
     }
 
     /**
      * 通知监听器，任务完成
      */
     private void successNotice(){
-        if(dlListener!=null){
-            dlListener.onSuccess(getSQLDownLoadInfo());
-        }
         if(downloadsuccess != null){
             downloadsuccess.onTaskSuccess(downloadInfo.getTaskID());
         }
     }
 
-    Handler handler = new Handler(){
-        @Override
-        public void handleMessage(Message msg) {
-            // TODO Auto-generated method stub
-            if(msg.what == TASK_START){ //开始下载
-                startNotice();
-            }else if(msg.what == TASK_STOP){ //停止下载
-                stopNotice();
-            }else if(msg.what == TASK_PROGESS){ //改变进程
-                onProgressNotice();
-            }else if(msg.what == TASK_ERROR){ //下载出错
-                errorNotice(msg.arg1);
-            }else if(msg.what == TASK_SUCCESS){ //下载完成
-                successNotice();
-            }
-        }
-    };
 
-    public boolean RenameFile(){
+    public synchronized int RenameFile(){
+        File olefile = new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName());
+        if(!olefile.exists()) return 0;
+
         File newfile = new File(downloadInfo.getFilePath());
         if(newfile.exists()){
             newfile.delete();
         }
-        File olefile = new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName());
 
         String filepath = downloadInfo.getFilePath();
         filepath = filepath.substring(0, filepath.lastIndexOf("/"));
@@ -291,7 +189,10 @@ public class DLWorker {
         if(!file.exists()){
             file.mkdirs();
         }
-        return olefile.renameTo(newfile);
+        if(olefile.renameTo(newfile))
+            return 1;
+        else
+            return -1;
     }
 
 
@@ -338,75 +239,65 @@ public class DLWorker {
 
                     accessFile = new RandomAccessFile (TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(),"rwd");
                     MappedByteBuffer mbb = accessFile.getChannel().map(FileChannel.MapMode.READ_WRITE,start,end-start+1);
-                    //accessFile.seek(start);
                     conn.setRequestProperty("Range", "bytes=" + start + "-" + end);
                     inputStream = conn.getInputStream();
                     byte[] buffer = new byte[1024 * 4];
                     int length;
                     while((length = inputStream.read(buffer)) != -1 && isdownloading){
-                        //accessFile.write(buffer, 0, length);
                         mbb.put(buffer,0,length);
                         subTaskDownloadSize +=length;  //更新当前线程下载量
+                        if(subTaskDownloadSize==(end-start+1))
+                            mbb.force();
                         synchronized (DLWorker.this){
                             downloadedSize += length; //更新文件全局下载量
                         }
                         int nowProgress = (int)((100 * downloadedSize)/fileSize);
                         if(nowProgress > progress){
                             progress = nowProgress;
-                            handler.sendEmptyMessage(TASK_PROGESS);
+                            Message msg = new Message();
+                            msg.what = MessageType.TASK_PROGRESS;
+                            msg.obj = getSQLDownLoadInfo();
+                            handler.sendMessage(msg);
                         }
                     }
-                    mbb.force();
-                    Log.v(TAG,"############"+subTaskDownloadSize+"-downloadsize:"+downloadedSize);
+
                     //下载完
                     if(downloadedSize == fileSize){ //最后一个完成的线程去转移文件和存数据库。
                         Log.v(TAG,"##################最后一个线程下载完成！！！");
-                        boolean renameResult = RenameFile();
-                        if(renameResult){
-                            handler.sendEmptyMessage(TASK_SUCCESS); //转移文件成功
-                        }else{
+                        int renameResult = RenameFile();
+                        if(renameResult==1){        //转移文件成功
+                            Message msg = new Message();
+                            msg.what = MessageType.TASK_SUCCESS;
+                            msg.obj = getSQLDownLoadInfo();
+                            handler.sendMessage(msg);
+                            successNotice();
+                            Log.v(TAG,downloadInfo.getFileName()+"下载完成!!!!!");
+                        }else if(renameResult==-1){  //转移文件失败
                             new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName()).delete();
                             Message msg = new Message();
-                            msg.what=TASK_ERROR;
+                            msg.what=MessageType.TASK_ERROR;
                             msg.arg1= ErrorCode.FILE_TRANS_ERROR;
-                            handler.sendMessage(msg);//转移文件失败
+                            msg.obj = getSQLDownLoadInfo();
+                            handler.sendMessage(msg);
                         }
                         //保存下载完成的状态
                         saveDownloadInfo();
                         downLoadThreads = null;
                         onDownload = false;
-                        Log.v(TAG,downloadInfo.getFileName()+"下载完成!!!!!");
+
                     }
+                    Log.v(TAG,"############"+subTaskDownloadSize+"-downloadsize:"+downloadedSize);
                     downloadTimes = maxDownloadTimes;
                 } catch (Exception e) {
                     if(isdownloading){
-                        if(isSupportBreakpoint){
-                            downloadTimes++;
-                            if(downloadTimes >= maxDownloadTimes){
-                                //for(int i =0;i<THREADS_PER_TASK;i++){
-                                //    downLoadThreads[i].stopDownLoad();
-                                //    pool.remove(downLoadThreads[i]);
-                                //}
-                                //if(downloadedSize>0)
-                                //    saveDownloadInfo();
-                                //downLoadThreads = null;
-                                //onDownload = false;
-                                Message msg = new Message();
-                                msg.what= TASK_ERROR;
-                                msg.arg1 = ErrorCode.DOWNLOAD_ERROR;
-                                handler.sendMessage(msg);
-                            }
-                        }else{
-                            downloadedSize = 0L;
-                            downloadTimes = maxDownloadTimes;
-                            onDownload = false;
-                            downLoadThreads = null;
+                        downloadTimes++;
+                        if(downloadTimes >= maxDownloadTimes){
                             Message msg = new Message();
-                            msg.what= TASK_ERROR;
+                            msg.what= MessageType.TASK_ERROR;
                             msg.arg1 = ErrorCode.DOWNLOAD_ERROR;
+                            msg.obj = getSQLDownLoadInfo();
                             handler.sendMessage(msg);
                         }
-
                     }else{
                         downloadTimes = maxDownloadTimes;
                     }
@@ -448,6 +339,7 @@ public class DLWorker {
      * 辅助线程：下载之前获取网络状态、文件分块、初始化下载线程等操作
      */
     class BeforeDownloadThread extends Thread{
+        int statusCode = 0;
         @Override
         public void run() {
             try {
@@ -481,8 +373,10 @@ public class DLWorker {
                 if(code>=400){
                     Log.e(TAG,"#######request error happened:"+code);
                     statusCode = code;
+                    before();
                     return;
                 }
+
                 //先判断数据库是否已经有下载信息如果有，直接读取开始下载
                 DownloadInfo di = dbAccessor.getDownLoadInfo(downloadInfo.getTaskID());
                 if(di!=null){
@@ -493,6 +387,7 @@ public class DLWorker {
                     downLoadThreads[2] = new DownLoadThread(di.getStart3(),di.getEnd3());
                     downloadedSize = di.getDownloadSize();
                     fileSize = di.getFileSize();
+                    before();
                     return;
                 }
 
@@ -518,20 +413,41 @@ public class DLWorker {
                     fileSize = contentSize;
                 }else{
                     statusCode = ErrorCode.FILE_SIZE_ZERO;
-                    return;
                 }
+                before();
             } catch (MalformedURLException e) {
                 statusCode=ErrorCode.MALFORMED_URL;
+                before();
                 e.printStackTrace();
             } catch (IOException e) {
                 statusCode=ErrorCode.FILE_ERROR;
+                before();
                 e.printStackTrace();
             } catch (Exception e) {
                 statusCode=ErrorCode.OTHERS;
+                before();
                 e.printStackTrace();
             }
         }
-    }
 
+        private void before(){
+            if(statusCode==0){
+                downloadTimes = 0;
+                onDownload =true;
+                Log.v(TAG,"file size:"+fileSize+" bytes");
+                Log.v(TAG,"start downloading.....");
+                handler.sendEmptyMessage(MessageType.TASK_START);
+                for(DownLoadThread thread:downLoadThreads){
+                    pool.execute(thread);
+                }
+            }else{
+                Message msg = new Message();
+                msg.what = MessageType.TASK_ERROR;
+                msg.arg1 = statusCode;
+                msg.obj = getSQLDownLoadInfo();
+                handler.sendMessage(msg);
+            }
+        }
+    }
 
 }

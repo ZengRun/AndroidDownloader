@@ -3,12 +3,10 @@ package zengrun.com.mydownloader;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.media.Image;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
@@ -28,16 +26,13 @@ import zengrun.com.mydownloader.download.DLManager;
 
 public class FinishedAdapter extends BaseAdapter {
     private List<DownloadInfo> list;
-    private Context mcontext;
+    private Context mContext;
     private DBAccessor dbAccessor;
     private DLManager dlManager;
     private RedownloadClickListener redownloadClickListener;
 
-    private final String TEMP_DIR = FileHelper.getTempDirPath();
-    private final String DIR = FileHelper.getFileDefaultPath();
-
     public FinishedAdapter(Context context,DLManager dlManager){
-        this.mcontext = context;
+        this.mContext = context;
         this.dlManager = dlManager;
         this.dbAccessor = new DBAccessor(context);
         this.list = dbAccessor.getAllFinished();
@@ -63,7 +58,7 @@ public class FinishedAdapter extends BaseAdapter {
         Holder holder;
         if(convertView == null){
             holder = new Holder();
-            convertView = LayoutInflater.from(mcontext).inflate(R.layout.finished_item_layout, null);
+            convertView = LayoutInflater.from(mContext).inflate(R.layout.finished_item_layout, null);
             holder.fileName = (TextView)convertView.findViewById(R.id.finished_file_name);
             holder.fileSize = (TextView)convertView.findViewById(R.id.finished_file_size);
             holder.deleteButton = (ImageButton)convertView.findViewById(R.id.delFinishedButton);
@@ -77,7 +72,7 @@ public class FinishedAdapter extends BaseAdapter {
         holder.deleteButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new AlertDialog.Builder(mcontext).setTitle("提示").setMessage("是否删除文件")
+                new AlertDialog.Builder(mContext).setTitle("提示").setMessage("是否删除文件")
                         .setPositiveButton("是", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {

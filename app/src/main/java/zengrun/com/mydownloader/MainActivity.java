@@ -43,14 +43,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.activity_main);
 
-
-
         addButton = (ImageButton)this.findViewById(R.id.button);
         listview = (ListView)this.findViewById(R.id.listView);
         finished = (TextView)this.findViewById(R.id.finished);
 
         manager = DLManager.getInstance(MainActivity.this);
-        manager.setSupportBreakpoint(true);
         adapter = new ListAdapter(MainActivity.this,manager,listview);
         listview.setAdapter(adapter);
 

@@ -1,6 +1,7 @@
 package zengrun.com.mydownloader.download;
 
 import android.content.Context;
+import android.os.Handler;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -20,26 +21,23 @@ import zengrun.com.mydownloader.database.DownloadInfo;
 
 public class DLManager {
     private final String TAG = "DLManager";
-    private Context mycontext;
+    private Context myContext;
 
     public List<DLWorker> workerList = new ArrayList<DLWorker>();
 
-    private final int MAX_DOWNLOADING_THREADS = 15; // 最大线程数
+    private final int MAX_DOWNLOADING_THREADS = 6; // 最大线程数
 
     private DownloadSuccess downloadSuccess = null;
-
-    //是否支持断点续传
-    private boolean isSupportBreakpoint = false;
 
     //线程池
     private ThreadPoolExecutor pool;
 
-    private DLListener tasklistener;
+    private Handler handler;
 
     private volatile static DLManager INSTANCE;
 
     private DLManager(Context context) {
-        mycontext = context;
+        myContext = context;
         init();
     }
 
@@ -50,19 +48,17 @@ public class DLManager {
         downloadSuccess = new DownloadSuccess() {
             @Override
             public void  onTaskSuccess(String TaskID) {
-                //synchronized (workerList) {
-                    int size = workerList.size();
-                    for (int i = 0; i < size; i++) {
-                        DLWorker downloader = workerList.get(i);
-                        if (downloader.getTaskID().equals(TaskID)) {
-                            workerList.remove(downloader);
-                            return;
-                        }
+                int size = workerList.size();
+                for (int i = 0; i < size; i++) {
+                    DLWorker downloader = workerList.get(i);
+                    if (downloader.getTaskID().equals(TaskID)) {
+                        workerList.remove(downloader);
+                        return;
                     }
-                //}
+                }
             }
         };
-        recoverData(mycontext);
+        recoverData(myContext);
     }
 
     public static DLManager getInstance(Context context){
@@ -75,7 +71,6 @@ public class DLManager {
         }
         return INSTANCE;
     }
-
 
     /**
      * (从数据库恢复下载任务信息)
@@ -90,31 +85,14 @@ public class DLManager {
             int listSize = sqlDownloadInfoList.size();
             for (int i = 0; i < listSize; i++) {
                 DownloadInfo downloadInfo = sqlDownloadInfoList.get(i);
-                DLWorker dloader = new DLWorker(context, downloadInfo, pool,isSupportBreakpoint,false);
-                dloader.setDownLoadSuccess(downloadSuccess);
-                dloader.setDlListener(tasklistener);
-                workerList.add(dloader);
+                DLWorker dworker = new DLWorker(context, downloadInfo, pool,false);
+                dworker.setDownLoadSuccess(downloadSuccess);
+                dworker.setTaskHandler(handler);
+                workerList.add(dworker);
             }
         }
         Log.v(TAG,"#####recover from database!");
     }
-
-
-    /**
-     * (设置下载管理是否支持断点续传)
-     * @param isSupportBreakpoint
-     */
-    public void setSupportBreakpoint(boolean isSupportBreakpoint) {
-        if((!this.isSupportBreakpoint) && isSupportBreakpoint){
-            int taskSize = workerList.size();
-            for (int i = 0; i < taskSize; i++) {
-                DLWorker downloader = workerList.get(i);
-                downloader.setSupportBreakpoint(true);
-            }
-        }
-        this.isSupportBreakpoint = isSupportBreakpoint;
-    }
-
 
     /**
      * 新增任务，默认开始执行下载任务
@@ -150,10 +128,10 @@ public class DLManager {
         } else {
             downloadinfo.setFilePath(filepath);
         }
-        DLWorker taskDLWorker = new DLWorker(mycontext, downloadinfo, pool,isSupportBreakpoint,true);
+        DLWorker taskDLWorker = new DLWorker(myContext, downloadinfo, pool,true);
         taskDLWorker.setDownLoadSuccess(downloadSuccess);
         taskDLWorker.start();
-        taskDLWorker.setDlListener(tasklistener);
+        taskDLWorker.setTaskHandler(handler);
         workerList.add(taskDLWorker);
         return 1;
     }
@@ -211,22 +189,6 @@ public class DLManager {
     }
 
     /**
-     * 重新下载
-     * @param taskID
-     */
-    public void restartTask(String taskID){
-        int listSize = workerList.size();
-        for(int i=0;i<listSize;i++){
-            DLWorker worker = workerList.get(i);
-            if(worker.getTaskID().equals(taskID)){
-                worker.destroy();
-                worker.start();
-                break;
-            }
-        }
-    }
-
-    /**
      * 删除任务同时删除文件
      * @param taskID
      */
@@ -242,16 +204,6 @@ public class DLManager {
         }
     }
 
-    /**
-     * 开始所有
-     */
-    public void startAllTask() {
-        int listSize = workerList.size();
-        for (int i = 0; i < listSize; i++) {
-            DLWorker downloader = workerList.get(i);
-            downloader.start();
-        }
-    }
 
     /**
      * 停止所有
@@ -265,62 +217,15 @@ public class DLManager {
     }
 
     /**
-     * 设置监听器
-     * @param listener
+     * @param listHandler
      */
-    public void setAllTaskListener(DLListener listener) {
-        tasklistener = listener;
+    public void setAllTaskHandler(Handler listHandler) {
+        handler = listHandler;
         int listSize = workerList.size();
         for (int i = 0; i < listSize; i++) {
             DLWorker downloader = workerList.get(i);
-            downloader.setDlListener(listener);
+            downloader.setTaskHandler(listHandler);
         }
     }
 
-    /**
-     * 是否正在下载
-     * @param taskID
-     * @return
-     */
-    public boolean isTaskdownloading(String taskID) {
-        DLWorker DLWorker = getDownloader(taskID);
-        if (DLWorker != null) {
-            return DLWorker.isDownLoading();
-        }
-        return false;
-    }
-
-    /**
-     * 获取下载器
-     */
-    private DLWorker getDownloader(String taskID) {
-        for (int i = 0; i < workerList.size(); i++) {
-            DLWorker worker = workerList.get(i);
-            if (taskID != null && taskID.equals(worker.getTaskID())) {
-                return worker;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 获取下载任务
-     */
-    public TaskInfo getTaskInfo(String taskID) {
-        DLWorker downloader = getDownloader(taskID);
-        if (downloader==null) {
-            return null;
-        }
-        DownloadInfo sqldownloadinfo = downloader.getSQLDownLoadInfo();
-        if (sqldownloadinfo==null) {
-            return null;
-        }
-        TaskInfo taskinfo = new TaskInfo();
-        taskinfo.setFileName(sqldownloadinfo.getFileName());
-        taskinfo.setOnDownloading(downloader.isDownLoading());
-        taskinfo.setTaskID(sqldownloadinfo.getTaskID());
-        taskinfo.setDownFileSize(sqldownloadinfo.getDownloadSize());
-        taskinfo.setFileSize(sqldownloadinfo.getFileSize());
-        return taskinfo;
-    }
 }
