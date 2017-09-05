@@ -9,7 +9,7 @@
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
         <activity
-            android:name="zengrun.com.mydownloader.MainActivity"
+            android:name="zengrun.com.mydownloader.activity.MainActivity"
             android:label="@string/on_downloading" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -17,7 +17,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="zengrun.com.mydownloader.FinishedActivity"
+            android:name="zengrun.com.mydownloader.activity.FinishedActivity"
             android:label="@string/finished_task" >
         </activity>
     </application>

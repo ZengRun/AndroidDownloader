@@ -58,13 +58,13 @@ public class DLWorker {
         this.downloadInfo = downloadInfo;
     }
 
-    public void start(){
+    void start(){
         if(downLoadThreads==null||downLoadThreads.length==0){
             new BeforeDownloadThread().start();
         }
     }
 
-    public void stop(){
+    void stop(){
         if(downLoadThreads!=null){
             Log.v(TAG,"下载暂停，存储断点信息");
             onDownload = false;
@@ -83,7 +83,7 @@ public class DLWorker {
         }
     }
 
-    public void destroy(){
+    void destroy(){
         if(downLoadThreads!=null){
             onDownload = false;
             for(int i=0;i<downLoadThreads.length;i++){
