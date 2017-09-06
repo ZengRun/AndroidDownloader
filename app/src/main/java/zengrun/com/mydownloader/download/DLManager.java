@@ -10,9 +10,11 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import zengrun.com.mydownloader.DownloadSuccess;
+import zengrun.com.mydownloader.bean.TaskInfo;
 import zengrun.com.mydownloader.database.DBAccessor;
 import zengrun.com.mydownloader.database.FileHelper;
-import zengrun.com.mydownloader.database.DownloadInfo;
+import zengrun.com.mydownloader.bean.DownloadInfo;
 
 /**
  * 下载任务管理调度
@@ -48,12 +50,14 @@ public class DLManager {
         downloadSuccess = new DownloadSuccess() {
             @Override
             public void  onTaskSuccess(String TaskID) {
-                int size = workerList.size();
-                for (int i = 0; i < size; i++) {
-                    DLWorker downloader = workerList.get(i);
-                    if (downloader.getTaskID().equals(TaskID)) {
-                        workerList.remove(downloader);
-                        return;
+                synchronized (DLManager.this) {
+                    int size = workerList.size();
+                    for (int i = 0; i < size; i++) {
+                        DLWorker downloader = workerList.get(i);
+                        if (downloader.getTaskID().equals(TaskID)) {
+                            workerList.remove(downloader);
+                            return;
+                        }
                     }
                 }
             }
@@ -85,7 +89,7 @@ public class DLManager {
             int listSize = sqlDownloadInfoList.size();
             for (int i = 0; i < listSize; i++) {
                 DownloadInfo downloadInfo = sqlDownloadInfoList.get(i);
-                DLWorker dworker = new DLWorker(context, downloadInfo, pool,false);
+                DLWorker dworker = new DLWorker(context, downloadInfo, pool);
                 dworker.setDownLoadSuccess(downloadSuccess);
                 dworker.setTaskHandler(handler);
                 workerList.add(dworker);
@@ -101,7 +105,7 @@ public class DLManager {
      * @param fileName 文件名
      * @return -1 : 文件已存在 ，0 ： 已存在任务列表 ， 1 ： 添加进任务列表
      */
-    public int addTask(String TaskID, String url, String fileName) {
+    public synchronized int addTask(String TaskID, String url, String fileName) {
         return addTask(TaskID, url, fileName, null);
     }
 
@@ -113,7 +117,7 @@ public class DLManager {
      * @param filepath 下载到本地的路径
      * @return -1 : 文件已存在 ，0 ： 已存在任务列表 ， 1 ： 添加进任务列表
      */
-    public int addTask(String TaskID, String url, String fileName, String filepath) {
+    public synchronized int addTask(String TaskID, String url, String fileName, String filepath) {
         if(TaskID == null){
             TaskID = fileName;
         }
@@ -128,7 +132,7 @@ public class DLManager {
         } else {
             downloadinfo.setFilePath(filepath);
         }
-        DLWorker taskDLWorker = new DLWorker(myContext, downloadinfo, pool,true);
+        DLWorker taskDLWorker = new DLWorker(myContext, downloadinfo, pool);
         taskDLWorker.setDownLoadSuccess(downloadSuccess);
         taskDLWorker.start();
         taskDLWorker.setTaskHandler(handler);
@@ -137,8 +141,54 @@ public class DLManager {
     }
 
     /**
-     * (获取当前任务列表的所有任务，以TaskInfo列表的方式返回)
-     *
+     * 开始任务
+     * @param taskID
+     */
+    public synchronized void startTask(String taskID) {
+        int listSize = workerList.size();
+        for (int i = 0; i < listSize; i++) {
+            DLWorker dlworker = workerList.get(i);
+            if (dlworker.getTaskID().equals(taskID)) {
+                dlworker.start();
+                break;
+            }
+        }
+    }
+
+    /**
+     * 停止任务
+     * @param taskID
+     */
+    public synchronized void stopTask(String taskID) {
+        int listSize = workerList.size();
+        for (int i = 0; i < listSize; i++) {
+            DLWorker worker = workerList.get(i);
+            if (worker.getTaskID().equals(taskID)) {
+                worker.stop();
+                break;
+            }
+        }
+    }
+
+    /**
+     * 删除任务同时删除文件
+     * @param taskID
+     */
+    public synchronized void deleteTask(String taskID) {
+        int size = workerList.size();
+        for (int i = 0; i < size; i++) {
+            DLWorker worker = workerList.get(i);
+            if (worker.getTaskID().equals(taskID)) {
+                worker.destroy();
+                workerList.remove(worker);
+                break;
+            }
+        }
+    }
+
+
+    /**
+     * 获取当前任务列表的所有任务
      * @return
      */
     public List<TaskInfo> getAllTask() {
@@ -159,55 +209,9 @@ public class DLManager {
     }
 
     /**
-     * 开始任务
-     * @param taskID
-     */
-    public void startTask(String taskID) {
-        int listSize = workerList.size();
-        for (int i = 0; i < listSize; i++) {
-            DLWorker dlworker = workerList.get(i);
-            if (dlworker.getTaskID().equals(taskID)) {
-                dlworker.start();
-                break;
-            }
-        }
-    }
-
-    /**
-     * 停止任务
-     * @param taskID
-     */
-    public void stopTask(String taskID) {
-        int listSize = workerList.size();
-        for (int i = 0; i < listSize; i++) {
-            DLWorker worker = workerList.get(i);
-            if (worker.getTaskID().equals(taskID)) {
-                worker.stop();
-                break;
-            }
-        }
-    }
-
-    /**
-     * 删除任务同时删除文件
-     * @param taskID
-     */
-    public void deleteTask(String taskID) {
-        int size = workerList.size();
-        for (int i = 0; i < size; i++) {
-            DLWorker worker = workerList.get(i);
-            if (worker.getTaskID().equals(taskID)) {
-                worker.destroy();
-                workerList.remove(worker);
-                break;
-            }
-        }
-    }
-
-    /**
      * 停止所有
      */
-    public void stopAllTask() {
+    public synchronized void stopAllTask() {
         int size = workerList.size();
         for (int i = 0; i < size; i++) {
             DLWorker worker = workerList.get(i);

@@ -7,7 +7,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.widget.ListView;
 
 import zengrun.com.mydownloader.R;
-import zengrun.com.mydownloader.database.DownloadInfo;
+import zengrun.com.mydownloader.bean.DownloadInfo;
 import zengrun.com.mydownloader.download.DLManager;
 
 /**

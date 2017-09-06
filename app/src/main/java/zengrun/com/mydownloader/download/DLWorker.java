@@ -18,10 +18,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import zengrun.com.mydownloader.DownloadSuccess;
 import zengrun.com.mydownloader.ErrorCode;
 import zengrun.com.mydownloader.MessageType;
 import zengrun.com.mydownloader.database.DBAccessor;
-import zengrun.com.mydownloader.database.DownloadInfo;
+import zengrun.com.mydownloader.bean.DownloadInfo;
 import zengrun.com.mydownloader.database.FileHelper;
 import zengrun.com.mydownloader.security.SslUtils;
 
@@ -50,7 +51,7 @@ public class DLWorker {
     private int progress = -1;
     private Handler handler;
 
-    public DLWorker(Context context, DownloadInfo downloadInfo, ThreadPoolExecutor pool, boolean isNewTask){
+    DLWorker(Context context, DownloadInfo downloadInfo, ThreadPoolExecutor pool){
         this.pool = pool;
         fileSize = downloadInfo.getFileSize();
         downloadedSize = downloadInfo.getDownloadSize();
@@ -202,7 +203,7 @@ public class DLWorker {
      */
     class DownLoadThread extends Thread{
         public volatile boolean isDead;
-        private boolean isdownloading;
+        private boolean isDownloading;
         private HttpURLConnection conn;
         private InputStream inputStream;
         RandomAccessFile accessFile;
@@ -213,7 +214,7 @@ public class DLWorker {
         public DownLoadThread(long start,long end){
             this.start = start;
             this.end = end;
-            isdownloading = true;
+            isDownloading = true;
             this.isDead = false;
         }
 
@@ -243,7 +244,7 @@ public class DLWorker {
                     inputStream = conn.getInputStream();
                     byte[] buffer = new byte[1024 * 4];
                     int length;
-                    while((length = inputStream.read(buffer)) != -1 && isdownloading){
+                    while((length = inputStream.read(buffer)) != -1 && isDownloading){
                         mbb.put(buffer,0,length);
                         subTaskDownloadSize +=length;  //更新当前线程下载量
                         if(subTaskDownloadSize==(end-start+1))
@@ -289,7 +290,7 @@ public class DLWorker {
                     Log.v(TAG,"############"+subTaskDownloadSize+"-downloadsize:"+downloadedSize);
                     downloadTimes = maxDownloadTimes;
                 } catch (Exception e) {
-                    if(isdownloading){
+                    if(isDownloading){
                         downloadTimes++;
                         if(downloadTimes >= maxDownloadTimes){
                             Message msg = new Message();
@@ -329,7 +330,7 @@ public class DLWorker {
         }
 
         public void stopDownLoad(){
-            isdownloading = false;
+            isDownloading = false;
             downloadTimes = maxDownloadTimes;
         }
 

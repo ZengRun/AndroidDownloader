@@ -15,8 +15,9 @@ import java.util.List;
 
 import zengrun.com.mydownloader.R;
 import zengrun.com.mydownloader.database.DBAccessor;
-import zengrun.com.mydownloader.database.DownloadInfo;
+import zengrun.com.mydownloader.bean.DownloadInfo;
 import zengrun.com.mydownloader.download.DLManager;
+import zengrun.com.mydownloader.thread.AddThread;
 
 
 /**
@@ -97,7 +98,7 @@ public class FinishedAdapter extends BaseAdapter {
                     downloadFile.delete(); //删除本地文件
                 }
                 dbAccessor.deleteDownLoadInfo(downloadInfo.getTaskID());//删除数据库的记录
-                dlManager.addTask(downloadInfo.getTaskID(),downloadInfo.getUrl(),downloadInfo.getFileName());
+                new AddThread(dlManager,downloadInfo.getTaskID(),downloadInfo.getUrl(),downloadInfo.getFileName()).start();
                 //传数据给FinishedActivity
                 if(redownloadClickListener!=null){
                     redownloadClickListener.OnButtonClick(downloadInfo);

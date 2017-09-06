@@ -1,4 +1,6 @@
-package zengrun.com.mydownloader.download;
+package zengrun.com.mydownloader.thread;
+
+import zengrun.com.mydownloader.download.DLManager;
 
 /**
  * Created by ZR on 2017/9/3.

@@ -8,6 +8,8 @@ import android.database.sqlite.SQLiteDatabase;
 import java.util.ArrayList;
 import java.util.List;
 
+import zengrun.com.mydownloader.bean.DownloadInfo;
+
 /**
  * Created by ZR on 2017/8/27.
  */

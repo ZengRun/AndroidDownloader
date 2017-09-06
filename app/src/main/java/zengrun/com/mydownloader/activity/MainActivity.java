@@ -24,7 +24,8 @@ import zengrun.com.mydownloader.R;
 import zengrun.com.mydownloader.database.FileHelper;
 import zengrun.com.mydownloader.download.DLManager;
 import zengrun.com.mydownloader.download.DLWorker;
-import zengrun.com.mydownloader.download.TaskInfo;
+import zengrun.com.mydownloader.bean.TaskInfo;
+import zengrun.com.mydownloader.thread.AddThread;
 
 public class MainActivity extends AppCompatActivity {
     private ImageButton addButton;
@@ -72,7 +73,8 @@ public class MainActivity extends AppCompatActivity {
                             int state = getFileState(info.getTaskID(),info.getFileName(),null);
                             if(state==1){
                                 //将任务添加到下载队列
-                                manager.addTask(info.getTaskID(), urlText.getText().toString(), info.getFileName());
+                                //manager.addTask(info.getTaskID(), urlText.getText().toString(), info.getFileName());
+                                new AddThread(manager,info.getTaskID(), urlText.getText().toString(), info.getFileName()).start();
                                 adapter.addItem(info);
                             }else if(state==0){
                                 Toast.makeText(getApplicationContext(),"任务已在列表中",Toast.LENGTH_SHORT).show();

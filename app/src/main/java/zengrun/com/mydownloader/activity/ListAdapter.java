@@ -24,11 +24,12 @@ import java.util.List;
 import zengrun.com.mydownloader.ErrorCode;
 import zengrun.com.mydownloader.MessageType;
 import zengrun.com.mydownloader.R;
-import zengrun.com.mydownloader.database.DownloadInfo;
+import zengrun.com.mydownloader.bean.DownloadInfo;
 import zengrun.com.mydownloader.download.DLManager;
-import zengrun.com.mydownloader.download.StartThread;
-import zengrun.com.mydownloader.download.StopThread;
-import zengrun.com.mydownloader.download.TaskInfo;
+import zengrun.com.mydownloader.thread.DeleteThread;
+import zengrun.com.mydownloader.thread.StartThread;
+import zengrun.com.mydownloader.thread.StopThread;
+import zengrun.com.mydownloader.bean.TaskInfo;
 
 /**
  * 未完成任务列表适配器
@@ -99,7 +100,8 @@ public class ListAdapter extends BaseAdapter {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 TaskInfo task = listData.get(position);
-                                dlManager.deleteTask(task.getTaskID());
+                                //dlManager.deleteTask(task.getTaskID());
+                                new DeleteThread(dlManager,task.getTaskID()).start();
                                 listData.remove(position);
                                 ListAdapter.this.notifyDataSetChanged();
                             }
@@ -217,7 +219,7 @@ public class ListAdapter extends BaseAdapter {
             if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
                 taskInfo.setOnDownloading(false);
                 if(errorCode==1||errorCode==2){
-                    Toast.makeText(mContext,taskInfo.getFileName()+"下载失败",Toast.LENGTH_LONG).show();
+                    Toast.makeText(mContext,taskInfo.getFileName()+"下载失败,请删除任务重试",Toast.LENGTH_LONG).show();
                 }else if(errorCode>=400){
                     Toast.makeText(mContext,taskInfo.getFileName()+"网络错误："+errorCode,Toast.LENGTH_LONG).show();
                 }else if(errorCode== ErrorCode.FILE_SIZE_ZERO){
@@ -232,9 +234,10 @@ public class ListAdapter extends BaseAdapter {
 
                 if(downloadInfo.getDownloadSize()==0){//还没开始下载，删除条目
                     listData.remove(taskInfo);
-                    dlManager.deleteTask(taskInfo.getTaskID());//并删除下载任务
+                    new DeleteThread(dlManager,taskInfo.getTaskID()).start();//并删除下载任务
                 }else{
-                    dlManager.stopTask(taskInfo.getTaskID());//如果是下载到一半出错则暂停任务并保存断点
+                    //dlManager.stopTask(taskInfo.getTaskID());//如果是下载到一半出错则暂停任务并保存断点
+                    new StopThread(dlManager,taskInfo.getTaskID()).start();
                 }
                 ListAdapter.this.notifyDataSetChanged();
                 break;
