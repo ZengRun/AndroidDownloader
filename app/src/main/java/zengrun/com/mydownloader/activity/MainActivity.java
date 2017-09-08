@@ -141,12 +141,14 @@ public class MainActivity extends AppCompatActivity {
      * @return  -1 : 文件已存在 ，0 ： 已存在任务列表 ， 1 ： 添加进任务列表
      */
     private int getFileState(String TaskID, String fileName, String filepath) {
-        int taskSize = manager.workerList.size();
-        for (int i = 0; i < taskSize; i++) {
-            DLWorker downloader = manager.workerList.get(i);
-            if (downloader.getTaskID().equals(TaskID)) {
-                Log.w(TAG,"已存在任务列表");
-                return 0;
+        synchronized (manager) {
+            int taskSize = manager.workerList.size();
+            for (int i = 0; i < taskSize; i++) {
+                DLWorker downloader = manager.workerList.get(i);
+                if (downloader.getTaskID().equals(TaskID)) {
+                    Log.w(TAG, "已存在任务列表");
+                    return 0;
+                }
             }
         }
         File file;
