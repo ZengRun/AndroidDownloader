@@ -6,6 +6,7 @@ import android.os.Message;
 import android.util.Log;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -14,6 +15,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -21,6 +23,7 @@ import javax.net.ssl.HttpsURLConnection;
 import zengrun.com.mydownloader.DownloadSuccess;
 import zengrun.com.mydownloader.ErrorCode;
 import zengrun.com.mydownloader.MessageType;
+import zengrun.com.mydownloader.bean.DataInfo;
 import zengrun.com.mydownloader.database.DBAccessor;
 import zengrun.com.mydownloader.bean.DownloadInfo;
 import zengrun.com.mydownloader.database.FileHelper;
@@ -42,8 +45,9 @@ public class DLWorker {
     private DownloadSuccess downloadsuccess;
     private DownloadInfo downloadInfo;
     private DownLoadThread[] downLoadThreads;
+    private WriteThread writeThread;
     private long fileSize = 0;//文件大小
-    private long downloadedSize;//已经下载的大小
+    private volatile long downloadedSize;//已经下载的大小
     private int downloadTimes = 0;//当前尝试请求的次数
     private boolean onDownload = false;//任务的状态
     private ThreadPoolExecutor pool;
@@ -69,17 +73,11 @@ public class DLWorker {
         if(downLoadThreads!=null){
             Log.v(TAG,"下载暂停，存储断点信息");
             onDownload = false;
-
             for(int i=0;i<THREADS_PER_TASK;i++){
                 downLoadThreads[i].stopDownLoad();
             }
             while(!(downLoadThreads[0].isDead&&downLoadThreads[1].isDead&&downLoadThreads[2].isDead)){}
             saveDownloadInfo();
-            for(int i=0;i<THREADS_PER_TASK;i++){
-                pool.remove(downLoadThreads[i]);
-                downLoadThreads[i]=null;
-            }
-            downLoadThreads=null;
             handler.sendEmptyMessage(MessageType.TASK_STOP);
         }
     }
@@ -89,10 +87,7 @@ public class DLWorker {
             onDownload = false;
             for(int i=0;i<downLoadThreads.length;i++){
                 downLoadThreads[i].stopDownLoad();
-                pool.remove(downLoadThreads[i]);
-                downLoadThreads[i]=null;
             }
-            downLoadThreads=null;
         }
         dbAccessor.deleteDownLoadInfo(downloadInfo.getTaskID());
         File downloadFile = new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName());
@@ -174,8 +169,7 @@ public class DLWorker {
         }
     }
 
-
-    public synchronized int RenameFile(){
+    public int RenameFile(){
         File olefile = new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName());
         if(!olefile.exists()) return 0;
 
@@ -206,14 +200,16 @@ public class DLWorker {
         private boolean isDownloading;
         private HttpURLConnection conn;
         private InputStream inputStream;
-        RandomAccessFile accessFile;
+        //RandomAccessFile accessFile;
         private long start;//开始下载的位置
         private long end;//结束位置
         private long subTaskDownloadSize;//当前线程下载量
+        private int index;
 
-        public DownLoadThread(long start,long end){
+        public DownLoadThread(long start,long end,int index){
             this.start = start;
             this.end = end;
+            this.index = index;
             isDownloading = true;
             this.isDead = false;
         }
@@ -238,17 +234,18 @@ public class DLWorker {
                     conn.setConnectTimeout(5000);
                     conn.setReadTimeout(10000);
 
-                    accessFile = new RandomAccessFile (TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(),"rwd");
-                    MappedByteBuffer mbb = accessFile.getChannel().map(FileChannel.MapMode.READ_WRITE,start,end-start+1);
+                    //accessFile = new RandomAccessFile (TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(),"rwd");
+                    //MappedByteBuffer mbb = accessFile.getChannel().map(FileChannel.MapMode.READ_WRITE,start,end-start+1);
                     conn.setRequestProperty("Range", "bytes=" + start + "-" + end);
                     inputStream = conn.getInputStream();
                     byte[] buffer = new byte[1024 * 4];
                     int length;
                     while((length = inputStream.read(buffer)) != -1 && isDownloading){
-                        mbb.put(buffer,0,length);
+                        //mbb.put(buffer,0,length);
+                        writeThread.add(new DataInfo(index,buffer,length));
                         subTaskDownloadSize +=length;  //更新当前线程下载量
-                        if(subTaskDownloadSize==(end-start+1))
-                            mbb.force();
+//                        if(subTaskDownloadSize==(end-start+1))
+//                            mbb.force();
                         synchronized (DLWorker.this){
                             downloadedSize += length; //更新文件全局下载量
                         }
@@ -260,32 +257,6 @@ public class DLWorker {
                             msg.obj = getSQLDownLoadInfo();
                             handler.sendMessage(msg);
                         }
-                    }
-
-                    //下载完
-                    if(downloadedSize == fileSize){ //最后一个完成的线程去转移文件和存数据库。
-                        Log.v(TAG,"##################最后一个线程下载完成！！！");
-                        int renameResult = RenameFile();
-                        if(renameResult==1){        //转移文件成功
-                            Message msg = new Message();
-                            msg.what = MessageType.TASK_SUCCESS;
-                            msg.obj = getSQLDownLoadInfo();
-                            handler.sendMessage(msg);
-                            successNotice();
-                            Log.v(TAG,downloadInfo.getFileName()+"下载完成!!!!!");
-                        }else if(renameResult==-1){  //转移文件失败
-                            new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName()).delete();
-                            Message msg = new Message();
-                            msg.what=MessageType.TASK_ERROR;
-                            msg.arg1= ErrorCode.FILE_TRANS_ERROR;
-                            msg.obj = getSQLDownLoadInfo();
-                            handler.sendMessage(msg);
-                        }
-                        //保存下载完成的状态
-                        saveDownloadInfo();
-                        downLoadThreads = null;
-                        onDownload = false;
-
                     }
                     Log.v(TAG,"############"+subTaskDownloadSize+"-downloadsize:"+downloadedSize);
                     downloadTimes = maxDownloadTimes;
@@ -315,12 +286,6 @@ public class DLWorker {
                             inputStream.close();
                         }
                     }catch (Exception e) {
-                        e.printStackTrace();
-                    }try {
-                        if(accessFile != null){
-                            accessFile.close();
-                        }
-                    } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
@@ -383,11 +348,13 @@ public class DLWorker {
                 if(di!=null){
                     Log.v(TAG,"#####继续任务");
                     downLoadThreads = new DownLoadThread[THREADS_PER_TASK];
-                    downLoadThreads[0] = new DownLoadThread(di.getStart1(),di.getEnd1());
-                    downLoadThreads[1] = new DownLoadThread(di.getStart2(),di.getEnd2());
-                    downLoadThreads[2] = new DownLoadThread(di.getStart3(),di.getEnd3());
+                    downLoadThreads[0] = new DownLoadThread(di.getStart1(),di.getEnd1(),1);
+                    downLoadThreads[1] = new DownLoadThread(di.getStart2(),di.getEnd2(),2);
+                    downLoadThreads[2] = new DownLoadThread(di.getStart3(),di.getEnd3(),3);
                     downloadedSize = di.getDownloadSize();
                     fileSize = di.getFileSize();
+                    writeThread = new WriteThread(di.getStart1(),di.getStart2(),di.getStart3(),
+                            di.getEnd1(),di.getEnd2(),di.getEnd3());
                     before();
                     return;
                 }
@@ -399,6 +366,8 @@ public class DLWorker {
                     tmpFile = new RandomAccessFile (TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(),"rwd");
                     tmpFile.setLength(contentSize);
                     downLoadThreads = new DownLoadThread[THREADS_PER_TASK];
+                    long []s = new long[3];
+                    long []e = new long[3];
                     //计算每个线程下载范围并创建下载线程
                     long blockSize = contentSize / THREADS_PER_TASK;
                     for(int i=0;i<THREADS_PER_TASK;i++){
@@ -407,11 +376,14 @@ public class DLWorker {
                         if(i==THREADS_PER_TASK-1){
                             end=contentSize-1;
                         }
-                        downLoadThreads[i] = new DownLoadThread(start,end);
+                        downLoadThreads[i] = new DownLoadThread(start,end,i+1);
+                        s[i] = start;
+                        e[i] = end;
                         Log.v(TAG,"#####线程"+i+": form "+start+" to "+end);
                     }
                     downloadInfo.setFileSize(contentSize);
                     fileSize = contentSize;
+                    writeThread = new WriteThread(s[0],s[1],s[2],e[0],e[1],e[2]);
                 }else{
                     statusCode = ErrorCode.FILE_SIZE_ZERO;
                 }
@@ -438,6 +410,7 @@ public class DLWorker {
                 Log.v(TAG,"file size:"+fileSize+" bytes");
                 Log.v(TAG,"start downloading.....");
                 handler.sendEmptyMessage(MessageType.TASK_START);
+                writeThread.start();
                 for(DownLoadThread thread:downLoadThreads){
                     pool.execute(thread);
                 }
@@ -448,6 +421,112 @@ public class DLWorker {
                 msg.obj = getSQLDownLoadInfo();
                 handler.sendMessage(msg);
             }
+        }
+    }
+
+
+    class WriteThread extends Thread{
+        long start1;
+        long start2;
+        long start3;
+        long end1;
+        long end2;
+        long end3;
+
+        RandomAccessFile accessFile1;
+        RandomAccessFile accessFile2;
+        RandomAccessFile accessFile3;
+        MappedByteBuffer mbb1;
+        MappedByteBuffer mbb2;
+        MappedByteBuffer mbb3;
+
+        LinkedBlockingQueue<DataInfo> queue;
+
+        public WriteThread(long start1,long start2,long start3,long end1,long end2,long end3) {
+            this.start1 = start1;
+            this.start2 = start2;
+            this.start3 = start3;
+            this.end1 = end1;
+            this.end2 = end2;
+            this.end3 = end3;
+            queue = new LinkedBlockingQueue<>();
+            try {
+                accessFile1 = new RandomAccessFile(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(), "rwd");
+                accessFile2 = new RandomAccessFile(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(), "rwd");
+                accessFile3 = new RandomAccessFile(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName(), "rwd");
+                mbb1 = accessFile1.getChannel().map(FileChannel.MapMode.READ_WRITE, start1, end1 - start1 + 1);
+                mbb2 = accessFile1.getChannel().map(FileChannel.MapMode.READ_WRITE, start2, end2 - start2 + 1);
+                mbb3 = accessFile1.getChannel().map(FileChannel.MapMode.READ_WRITE, start3, end3 - start3 + 1);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public void run() {
+            while(true){
+                if(!queue.isEmpty()){
+                    DataInfo di = queue.poll();
+                    byte[] buff = di.getBuff();
+                    int index = di.getIndex();
+                    int len = di.getLen();
+                    if(index ==1){
+                        mbb1.put(buff,0,len);
+                    }else if(index==2){
+                        mbb2.put(buff,0,len);
+                    }else{
+                        mbb3.put(buff,0,len);
+                    }
+                }
+
+                if(queue.isEmpty()&&downLoadThreads[0].isDead&&downLoadThreads[1].isDead&&downLoadThreads[2].isDead){
+                    //下载完成
+                    if(downloadedSize == fileSize){
+                        mbb1.force();
+                        mbb2.force();
+                        mbb3.force();
+                        Log.v(TAG,"##################最后一个线程下载完成！！！");
+                        int renameResult = RenameFile();
+                        if(renameResult==1){        //转移文件成功
+                            Message msg = new Message();
+                            msg.what = MessageType.TASK_SUCCESS;
+                            msg.obj = getSQLDownLoadInfo();
+                            handler.sendMessage(msg);
+                            successNotice();
+                            Log.v(TAG,downloadInfo.getFileName()+"下载完成!!!!!");
+                        }else if(renameResult==-1){  //转移文件失败
+                            new File(TEMP_DIR + "/(" + FileHelper.filterIDChars(downloadInfo.getTaskID()) + ")" + downloadInfo.getFileName()).delete();
+                            Message msg = new Message();
+                            msg.what=MessageType.TASK_ERROR;
+                            msg.arg1= ErrorCode.FILE_TRANS_ERROR;
+                            msg.obj = getSQLDownLoadInfo();
+                            handler.sendMessage(msg);
+                        }
+                        //保存下载完成的状态
+                        saveDownloadInfo();
+                        onDownload = false;
+                    }
+                    try {
+                        accessFile1.close();
+                        accessFile2.close();
+                        accessFile3.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    for(int i=0;i<THREADS_PER_TASK;i++){
+                        pool.remove(downLoadThreads[i]);
+                        downLoadThreads[i]=null;
+                    }
+                    downLoadThreads=null;
+                    return;
+                }
+            }
+        }
+
+        public void add(DataInfo di){
+            queue.offer(di);
         }
     }
 
