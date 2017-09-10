@@ -20,6 +20,8 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import zengrun.com.mydownloader.ErrorCode;
 import zengrun.com.mydownloader.MessageType;
@@ -43,13 +45,23 @@ public class ListAdapter extends BaseAdapter {
     private Context mContext;
     private DLManager dlManager;
     private ListView listView;
+    private Timer timer;
 
     public ListAdapter(Context context,DLManager dlManager,ListView listView){
         this.mContext = context;
         this.dlManager = dlManager;
+        this.timer = new Timer();
         listData = dlManager.getAllTask();
         this.listView = listView;
         dlManager.setAllTaskHandler(handler);
+
+        TimerTask progressTask = new TimerTask() {
+            @Override
+            public void run() {
+                refreshHandler.sendEmptyMessage(0);
+            }
+        };
+        timer.scheduleAtFixedRate(progressTask, 0, 1000);
     }
 
     @Override
@@ -126,11 +138,21 @@ public class ListAdapter extends BaseAdapter {
         this.notifyDataSetInvalidated();
     }
 
-    private void updateItem(int position,TaskInfo taskInfo){
-        int visibleFirstPosi = listView.getFirstVisiblePosition();
-        int visibleLastPosi = listView.getLastVisiblePosition();
-        if (position >= visibleFirstPosi && position <= visibleLastPosi) {
-            View view = listView.getChildAt(position-visibleFirstPosi);
+//    private void updateItem(int position,TaskInfo taskInfo){
+//        int visibleFirstPosi = listView.getFirstVisiblePosition();
+//        int visibleLastPosi = listView.getLastVisiblePosition();
+//        if (position >= visibleFirstPosi && position <= visibleLastPosi) {
+//            View view = listView.getChildAt(position-visibleFirstPosi);
+//            Holder viewHolder = (Holder)view.getTag();
+//            viewHolder.textProgress.setText(taskInfo.getProgress() + "%");
+//            viewHolder.fileProgress.setProgress(taskInfo.getProgress());
+//        }
+//    }
+
+    private void updateItems(){
+        for(int i=0;i<listData.size();i++){
+            TaskInfo taskInfo = listData.get(i);
+            View view = listView.getChildAt(i);
             Holder viewHolder = (Holder)view.getTag();
             viewHolder.textProgress.setText(taskInfo.getProgress() + "%");
             viewHolder.fileProgress.setProgress(taskInfo.getProgress());
@@ -188,6 +210,15 @@ public class ListAdapter extends BaseAdapter {
         }
     };
 
+    private Handler refreshHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            // TODO Auto-generated method stub
+            updateItems();
+        }
+    };
+
+
     private void progress(DownloadInfo downloadInfo){
         //根据监听到的信息查找列表相对应的任务，更新相应任务的进度
         for(int i = 0;i<listData.size();i++){
@@ -195,7 +226,7 @@ public class ListAdapter extends BaseAdapter {
             if(taskInfo.getTaskID().equals(downloadInfo.getTaskID())){
                 taskInfo.setDownFileSize(downloadInfo.getDownloadSize());
                 taskInfo.setFileSize(downloadInfo.getFileSize());
-                updateItem(i,taskInfo);
+                //updateItem(i,taskInfo);
                 break;
             }
         }
